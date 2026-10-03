@@ -161,9 +161,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         }
       } else {
-        setUser(null);
-        setToken(null);
-        api.clearSession();
+        if (!api.getToken()) {
+          setUser(null);
+          setToken(null);
+          api.clearSession();
+        }
         setLoading(false);
       }
     });

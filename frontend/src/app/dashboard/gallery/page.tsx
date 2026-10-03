@@ -344,6 +344,7 @@ function GalleryContent() {
                     src={asset.image}
                     alt={`${asset.name} - ${asset.colorway}`}
                     fill
+                    unoptimized
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className="object-contain p-3 transition-transform duration-300 group-hover:scale-105"
                   />
@@ -454,6 +455,7 @@ function GalleryContent() {
                 src={previewAsset.image}
                 alt={previewAsset.name}
                 fill
+                unoptimized
                 className="object-contain p-4"
               />
             </div>

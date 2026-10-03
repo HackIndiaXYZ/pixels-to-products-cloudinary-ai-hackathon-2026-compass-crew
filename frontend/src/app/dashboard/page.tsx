@@ -377,6 +377,7 @@ export default function DashboardOverviewPage() {
                                 src={job.product_image || "/products/sneaker-navy.png"}
                                 alt={job.product_name || "Product"}
                                 fill
+                                unoptimized
                                 sizes="40px"
                                 className="object-contain p-1"
                               />

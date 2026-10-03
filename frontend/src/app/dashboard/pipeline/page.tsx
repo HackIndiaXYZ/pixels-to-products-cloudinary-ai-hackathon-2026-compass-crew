@@ -316,6 +316,7 @@ export default function PipelinePage() {
                               src={job.image}
                               alt={job.name}
                               fill
+                              unoptimized
                               sizes="40px"
                               className="object-contain p-1"
                             />

@@ -385,6 +385,7 @@ function CreateStudioContent() {
                   src={displayImage}
                   alt={currentProduct?.product_name || "Source Image"}
                   fill
+                  unoptimized
                   sizes="96px"
                   className="object-contain p-2"
                 />
@@ -746,6 +747,7 @@ function CreateStudioContent() {
                     src={displayImage}
                     alt="Canvas Preview"
                     fill
+                    unoptimized
                     sizes="420px"
                     className="object-contain"
                   />
@@ -878,6 +880,7 @@ function CreateStudioContent() {
                       src={cw.image}
                       alt={cw.name}
                       fill
+                      unoptimized
                       sizes="160px"
                       className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
                     />
