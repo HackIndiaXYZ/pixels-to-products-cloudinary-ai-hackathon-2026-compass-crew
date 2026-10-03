@@ -42,6 +42,10 @@ next-env.d.ts
 .env.development.local
 .env.test.local
 .env.production.local
+*service-account*.json
+*serviceAccount*.json
+*firebase-credentials*.json
+firebase-key.json
 
 # Logs
 *.log

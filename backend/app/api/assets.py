@@ -8,10 +8,43 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.asset import AssetResponse
-from app.services.asset_service import get_job_assets, get_product_assets, delete_asset
+from app.services.asset_service import (
+    get_job_assets,
+    get_product_assets,
+    get_user_assets,
+    delete_asset
+)
 from app.services.product_service import get_product
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
+
+
+@router.get(
+    "/",
+    response_model=List[AssetResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List all assets belonging to current user"
+)
+def list_user_all_assets(
+    format: Optional[str] = Query(None, description="Filter by format e.g. 1:1, 4:5, 9:16, 16:9"),
+    color: Optional[str] = Query(None, description="Filter by colorway"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> List[AssetResponse]:
+    """
+    Returns all generated and transformed media assets belonging to the authenticated user.
+    """
+    assets = get_user_assets(
+        db=db,
+        user_id=str(current_user.id),
+        format_filter=format,
+        color_filter=color,
+        skip=skip,
+        limit=limit
+    )
+    return [AssetResponse.model_validate(a) for a in assets]
 
 
 @router.get(

@@ -74,3 +74,23 @@ def delete_asset(db: Session, asset_id: str) -> bool:
     db.delete(asset)
     db.commit()
     return True
+
+
+def get_user_assets(
+    db: Session,
+    user_id: str,
+    format_filter: Optional[str] = None,
+    color_filter: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100
+) -> List[Asset]:
+    """
+    Retrieves all assets belonging to products owned by the user,
+    with optional format and colorway filtering.
+    """
+    query = db.query(Asset).join(Product).filter(Product.user_id == user_id)
+    if format_filter and format_filter != "All":
+        query = query.filter(Asset.format == format_filter)
+    if color_filter:
+        query = query.filter(Asset.colorway.ilike(f"%{color_filter}%"))
+    return query.order_by(Asset.created_at.desc()).offset(skip).limit(limit).all()

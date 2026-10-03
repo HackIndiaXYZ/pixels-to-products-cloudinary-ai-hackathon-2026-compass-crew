@@ -56,6 +56,26 @@ def get_job_status(db: Session, job_id: str) -> GenerationJob:
     return job
 
 
+def get_user_generation_jobs(
+    db: Session,
+    user_id: str,
+    skip: int = 0,
+    limit: int = 50
+) -> List[GenerationJob]:
+    """
+    Fetches all generation jobs for products owned by the user, newest first.
+    """
+    return (
+        db.query(GenerationJob)
+        .join(Product)
+        .filter(Product.user_id == user_id)
+        .order_by(GenerationJob.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
 def process_generation_pipeline(job_id: str, db: Session) -> None:
     """
     Background worker pipeline executing variant creation and Cloudinary transformations.

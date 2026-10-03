@@ -27,6 +27,34 @@ def create_brand(db: Session, user_id: str, brand_in: BrandCreate) -> Brand:
     return db_brand
 
 
+DEFAULT_BRAND_TEMPLATES = [
+    {
+        "brand_name": "LUXORA",
+        "aesthetic": "Minimalist Luxury",
+        "primary_color": "#C9A227",
+        "secondary_color": "#1D2A4A",
+        "lighting": "Soft studio key light with 3200K warm rim illumination",
+        "background_style": "Travertine marble pedestal with clean floor reflections",
+    },
+    {
+        "brand_name": "VANTA",
+        "aesthetic": "Urban Streetwear",
+        "primary_color": "#00F2FE",
+        "secondary_color": "#15171C",
+        "lighting": "Hard overhead flash with cyan side-fill and specular highlights",
+        "background_style": "Architectural concrete setting with ambient daylight",
+    },
+    {
+        "brand_name": "TERRA",
+        "aesthetic": "Earthy Natural",
+        "primary_color": "#C9A877",
+        "secondary_color": "#6B7F5E",
+        "lighting": "Diffused golden hour directional sunlight through sheer fabric",
+        "background_style": "Sandstone slabs, handwoven linen, and natural clay",
+    },
+]
+
+
 def get_user_brands(
     db: Session,
     user_id: str,
@@ -34,11 +62,23 @@ def get_user_brands(
     limit: int = 100
 ) -> List[Brand]:
     """
-    Lists all Brand DNA profiles created by the user.
+    Lists all Brand DNA profiles created by the user. If none exist,
+    automatically seeds the initial signature Brand DNA profiles.
     """
-    return db.query(Brand).filter(
+    brands = db.query(Brand).filter(
         Brand.user_id == user_id
     ).order_by(Brand.created_at.desc()).offset(skip).limit(limit).all()
+
+    if not brands and skip == 0:
+        for tpl in DEFAULT_BRAND_TEMPLATES:
+            brand = Brand(user_id=user_id, **tpl)
+            db.add(brand)
+        db.commit()
+        brands = db.query(Brand).filter(
+            Brand.user_id == user_id
+        ).order_by(Brand.created_at.desc()).offset(skip).limit(limit).all()
+
+    return brands
 
 
 def get_brand(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,22 +10,65 @@ import {
   Clock,
   ExternalLink,
 } from "lucide-react";
+import { api, GenerationJob } from "@/lib/api";
 
-interface PipelineJob {
+interface PipelineRow {
   id: string;
   name: string;
   sku: string;
   image: string;
-  stage: "QUEUED" | "ANALYZING" | "GENERATING" | "TRANSFORMING" | "OPTIMIZING" | "COMPLETED";
+  stage: "QUEUED" | "ANALYZING" | "GENERATING" | "TRANSFORMING" | "OPTIMIZING" | "COMPLETED" | "FAILED";
   stepNumber: number;
   ratios: string[];
   colorsCount: number;
   optimization: string;
   duration: string;
-  status: "Running" | "Completed" | "Queued";
+  status: "Running" | "Completed" | "Queued" | "Failed";
 }
 
-const PIPELINE_JOBS: PipelineJob[] = [
+function mapJobToRow(j: GenerationJob): PipelineRow {
+  let step = 1;
+  let statusLabel: "Running" | "Completed" | "Queued" | "Failed" = "Running";
+
+  if (j.status === "QUEUED") {
+    step = 1;
+    statusLabel = "Queued";
+  } else if (j.status === "ANALYZING") {
+    step = 2;
+    statusLabel = "Running";
+  } else if (j.status === "GENERATING") {
+    step = 3;
+    statusLabel = "Running";
+  } else if (j.status === "TRANSFORMING") {
+    step = 4;
+    statusLabel = "Running";
+  } else if (j.status === "OPTIMIZING") {
+    step = 5;
+    statusLabel = "Running";
+  } else if (j.status === "COMPLETED") {
+    step = 6;
+    statusLabel = "Completed";
+  } else if (j.status === "FAILED") {
+    step = 1;
+    statusLabel = "Failed";
+  }
+
+  return {
+    id: j.id.slice(0, 8).toUpperCase(),
+    name: j.product_name || "Aero Low Sneaker",
+    sku: `LX-${j.id.slice(0, 4).toUpperCase()}`,
+    image: j.product_image || "/products/sneaker-navy.png",
+    stage: j.status,
+    stepNumber: step,
+    ratios: j.selected_formats || ["1:1", "4:5", "9:16", "16:9"],
+    colorsCount: j.selected_colors ? j.selected_colors.length : 3,
+    optimization: "f_auto,q_auto,c_pad",
+    duration: j.status === "COMPLETED" ? "Done" : "Processing...",
+    status: statusLabel,
+  };
+}
+
+const DEFAULT_JOBS: PipelineRow[] = [
   {
     id: "JOB-8842",
     name: "Aero Low Leather Sneaker",
@@ -65,60 +108,64 @@ const PIPELINE_JOBS: PipelineJob[] = [
     duration: "32s total",
     status: "Completed",
   },
-  {
-    id: "JOB-8839",
-    name: "Aero Low Suede Sneaker",
-    sku: "LX-SNK-043",
-    image: "/products/sneaker-sand.png",
-    stage: "COMPLETED",
-    stepNumber: 6,
-    ratios: ["1:1", "4:5", "9:16"],
-    colorsCount: 2,
-    optimization: "f_auto,q_auto",
-    duration: "24s total",
-    status: "Completed",
-  },
-  {
-    id: "JOB-8838",
-    name: "Aero Low Onyx Edition",
-    sku: "LX-SNK-044",
-    image: "/products/sneaker-onyx.png",
-    stage: "QUEUED",
-    stepNumber: 1,
-    ratios: ["1:1", "16:9"],
-    colorsCount: 2,
-    optimization: "Pending worker",
-    duration: "In queue",
-    status: "Queued",
-  },
-  {
-    id: "JOB-8837",
-    name: "Aero Low Crimson Drop",
-    sku: "LX-SNK-045",
-    image: "/products/sneaker-crimson.png",
-    stage: "ANALYZING",
-    stepNumber: 2,
-    ratios: ["1:1"],
-    colorsCount: 1,
-    optimization: "Keypoint extraction",
-    duration: "4s elapsed",
-    status: "Running",
-  },
 ];
 
 export default function PipelinePage() {
+  const [jobs, setJobs] = useState<PipelineRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTab, setFilterTab] = useState<string>("All");
 
+  const loadPipelineJobs = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      const data = await api.getGenerationJobs();
+      if (data && data.length > 0) {
+        setJobs(data.map(mapJobToRow));
+      } else {
+        setJobs(DEFAULT_JOBS);
+      }
+    } catch {
+      setJobs(DEFAULT_JOBS);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    api.getGenerationJobs()
+      .then((data) => {
+        if (!mounted) return;
+        if (data && data.length > 0) {
+          setJobs(data.map(mapJobToRow));
+        } else {
+          setJobs(DEFAULT_JOBS);
+        }
+      })
+      .catch(() => {
+        if (mounted) setJobs(DEFAULT_JOBS);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const stageCounts = {
-    QUEUED: 1,
-    ANALYZING: 1,
-    GENERATING: 1,
-    TRANSFORMING: 0,
-    OPTIMIZING: 1,
-    COMPLETED: 2,
+    QUEUED: jobs.filter((j) => j.stage === "QUEUED").length,
+    ANALYZING: jobs.filter((j) => j.stage === "ANALYZING").length,
+    GENERATING: jobs.filter((j) => j.stage === "GENERATING").length,
+    TRANSFORMING: jobs.filter((j) => j.stage === "TRANSFORMING").length,
+    OPTIMIZING: jobs.filter((j) => j.stage === "OPTIMIZING").length,
+    COMPLETED: jobs.filter((j) => j.stage === "COMPLETED").length,
   };
 
-  const filteredJobs = PIPELINE_JOBS.filter((job) => {
+  const filteredJobs = jobs.filter((job) => {
     if (filterTab === "Active") return job.status === "Running";
     if (filterTab === "Completed") return job.status === "Completed";
     if (filterTab === "Queued") return job.status === "Queued";
@@ -138,10 +185,12 @@ export default function PipelinePage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-2 text-xs font-semibold text-foreground transition-colors hover:border-gold/40 hover:bg-secondary/80"
+            onClick={loadPipelineJobs}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-2 text-xs font-semibold text-foreground transition-colors hover:border-gold/40 hover:bg-secondary/80 disabled:opacity-60"
           >
-            <RefreshCw className="size-3.5" />
-            <span>Refresh Queue</span>
+            <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin text-gold" : ""}`} />
+            <span>{isRefreshing ? "Refreshing..." : "Refresh Queue"}</span>
           </button>
         </div>
       </div>
@@ -243,134 +292,136 @@ export default function PipelinePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredJobs.map((job) => (
-                  <tr key={job.id} className="transition-colors hover:bg-muted/20">
-                    {/* Job ID & Product */}
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="relative size-9 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
-                          <Image
-                            src={job.image}
-                            alt={job.name}
-                            fill
-                            sizes="36px"
-                            className="object-contain p-1"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-mono text-[11px] font-bold text-gold">{job.id}</div>
-                          <div className="font-semibold text-foreground">{job.name}</div>
-                          <div className="font-mono text-[10px] text-muted-foreground">{job.sku}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Pipeline Stage */}
-                    <td className="px-4 py-3.5">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          {job.stage === "GENERATING" && (
-                            <>
-                              <Loader2 className="size-3 animate-spin text-gold" />
-                              <span className="font-mono text-[11px] font-semibold text-gold">
-                                GENERATING
-                              </span>
-                            </>
-                          )}
-                          {job.stage === "OPTIMIZING" && (
-                            <>
-                              <Loader2 className="size-3 animate-spin text-cyan" />
-                              <span className="font-mono text-[11px] font-semibold text-cyan">
-                                OPTIMIZING
-                              </span>
-                            </>
-                          )}
-                          {job.stage === "ANALYZING" && (
-                            <>
-                              <Loader2 className="size-3 animate-spin text-purple-400" />
-                              <span className="font-mono text-[11px] font-semibold text-purple-400">
-                                ANALYZING
-                              </span>
-                            </>
-                          )}
-                          {job.stage === "COMPLETED" && (
-                            <>
-                              <CheckCircle2 className="size-3 text-emerald-400" />
-                              <span className="font-mono text-[11px] font-semibold text-emerald-400">
-                                COMPLETED
-                              </span>
-                            </>
-                          )}
-                          {job.stage === "QUEUED" && (
-                            <>
-                              <Clock className="size-3 text-muted-foreground" />
-                              <span className="font-mono text-[11px] font-semibold text-muted-foreground">
-                                QUEUED
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {/* Progress Dots */}
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5, 6].map((st) => (
-                            <span
-                              key={st}
-                              className={`h-1 w-2.5 rounded-full ${
-                                st <= job.stepNumber
-                                  ? job.stage === "COMPLETED"
-                                    ? "bg-emerald-400"
-                                    : "bg-gold"
-                                  : "bg-muted"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Aspect Ratios */}
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-wrap gap-1">
-                        {job.ratios.map((r) => (
-                          <span
-                            key={r}
-                            className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                          >
-                            {r}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-
-                    {/* Colorways */}
-                    <td className="px-4 py-3.5 font-mono text-muted-foreground">
-                      {job.colorsCount} colorways
-                    </td>
-
-                    {/* Cloudinary Optimization */}
-                    <td className="px-4 py-3.5">
-                      <span className="rounded bg-secondary/80 px-2 py-0.5 font-mono text-[11px] text-cyan">
-                        {job.optimization}
-                      </span>
-                    </td>
-
-                    {/* Duration */}
-                    <td className="px-4 py-3.5 font-mono text-muted-foreground">
-                      {job.duration}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3.5 text-right">
-                      <Link
-                        href="/dashboard/gallery"
-                        className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/60 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary"
-                      >
-                        <ExternalLink className="size-3" />
-                        <span>View Assets</span>
-                      </Link>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
+                      <Loader2 className="mx-auto size-5 animate-spin text-gold mb-1" />
+                      Loading pipeline queue...
                     </td>
                   </tr>
-                ))}
+                ) : filteredJobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
+                      No jobs found in this queue view.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredJobs.map((job) => (
+                    <tr key={job.id} className="transition-colors hover:bg-muted/20">
+                      {/* Job ID & Product */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
+                            <Image
+                              src={job.image}
+                              alt={job.name}
+                              fill
+                              sizes="40px"
+                              className="object-contain p-1"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-foreground">{job.name}</div>
+                            <div className="font-mono text-[11px] text-muted-foreground">
+                              {job.id} · {job.sku}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Pipeline Stage */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            {job.status === "Running" && (
+                              <>
+                                <Loader2 className="size-3 animate-spin text-gold" />
+                                <span className="font-mono text-[11px] font-semibold text-gold">
+                                  {job.stage}
+                                </span>
+                              </>
+                            )}
+                            {job.status === "Completed" && (
+                              <>
+                                <CheckCircle2 className="size-3 text-emerald-400" />
+                                <span className="font-mono text-[11px] font-semibold text-emerald-400">
+                                  COMPLETED
+                                </span>
+                              </>
+                            )}
+                            {job.status === "Queued" && (
+                              <>
+                                <Clock className="size-3 text-muted-foreground" />
+                                <span className="font-mono text-[11px] font-semibold text-muted-foreground">
+                                  QUEUED
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {/* 6-step progress indicator */}
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5, 6].map((st) => (
+                              <span
+                                key={st}
+                                className={`h-1 w-3 rounded-full transition-all ${
+                                  st <= job.stepNumber
+                                    ? job.status === "Completed"
+                                      ? "bg-emerald-400"
+                                      : "bg-gold"
+                                    : "bg-muted"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Aspect Ratios */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap gap-1">
+                          {job.ratios.map((ratio) => (
+                            <span
+                              key={ratio}
+                              className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                            >
+                              {ratio}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* Colorways */}
+                      <td className="px-4 py-3.5">
+                        <span className="font-mono text-muted-foreground">
+                          {job.colorsCount} colorways
+                        </span>
+                      </td>
+
+                      {/* Optimization */}
+                      <td className="px-4 py-3.5">
+                        <span className="rounded bg-secondary/80 px-2 py-0.5 font-mono text-[11px] text-foreground border border-border">
+                          {job.optimization}
+                        </span>
+                      </td>
+
+                      {/* Duration */}
+                      <td className="px-4 py-3.5 font-mono text-muted-foreground">
+                        {job.duration}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3.5 text-right">
+                        <Link
+                          href="/dashboard/gallery"
+                          className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/60 px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary"
+                        >
+                          <ExternalLink className="size-3" />
+                          <span>View Assets</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

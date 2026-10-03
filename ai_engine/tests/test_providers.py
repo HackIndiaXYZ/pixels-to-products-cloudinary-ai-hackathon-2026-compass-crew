@@ -15,8 +15,10 @@ def test_mock_provider_instantiation():
     assert provider.provider_name == "mock"
 
 
-def test_missing_api_key_raises_error():
+def test_missing_api_key_raises_error(monkeypatch):
     """Verify GeminiProvider raises MissingAPIKeyError when no key is configured."""
+    from ai_engine.config import settings
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
     with pytest.raises(MissingAPIKeyError):
         GeminiProvider(api_key=None)
 

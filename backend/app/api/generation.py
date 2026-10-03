@@ -1,6 +1,5 @@
-from __future__ import annotations
-
-from fastapi import APIRouter, Depends, BackgroundTasks, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, BackgroundTasks, status, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db, SessionLocal
@@ -10,11 +9,39 @@ from app.schemas.generation import GenerationRequest, GenerationJobResponse
 from app.services.generation_service import (
     create_generation_job,
     get_job_status,
+    get_user_generation_jobs,
     process_generation_pipeline
 )
 from app.services.product_service import get_product
 
 router = APIRouter(prefix="/generations", tags=["Generations"])
+
+
+def _format_job_response(job) -> GenerationJobResponse:
+    resp = GenerationJobResponse.model_validate(job)
+    if hasattr(job, "product") and job.product:
+        resp.product_name = job.product.product_name
+        resp.product_image = job.product.cloudinary_url
+    return resp
+
+
+@router.get(
+    "/",
+    response_model=List[GenerationJobResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List all generation jobs for authenticated user"
+)
+def list_generation_jobs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> List[GenerationJobResponse]:
+    """
+    Returns all generation jobs associated with products owned by the authenticated user.
+    """
+    jobs = get_user_generation_jobs(db=db, user_id=str(current_user.id), skip=skip, limit=limit)
+    return [_format_job_response(j) for j in jobs]
 
 
 def _run_job_in_background(job_id: str) -> None:
@@ -53,7 +80,7 @@ def trigger_generation(
     # Schedule background processing
     background_tasks.add_task(_run_job_in_background, job.id)
 
-    return GenerationJobResponse.model_validate(job)
+    return _format_job_response(job)
 
 
 @router.get(
@@ -71,4 +98,4 @@ def check_job_status(
     Polls the current status, step message, and percentage completion of a generation job.
     """
     job = get_job_status(db=db, job_id=job_id)
-    return GenerationJobResponse.model_validate(job)
+    return _format_job_response(job)

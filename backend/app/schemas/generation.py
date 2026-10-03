@@ -11,6 +11,8 @@ class GenerationRequest(BaseModel):
         default=["1:1", "4:5", "9:16", "16:9"],
         description="Target aspect ratio formats: '1:1', '4:5', '9:16', '16:9'"
     )
+    selected_scene: Optional[str] = Field(default="minimal", description="Scene environment: minimal, luxury, urban, studio")
+    brand_id: Optional[str] = Field(default=None, description="Optional Brand DNA ID to apply")
 
 
 class GenerationJobResponse(BaseModel):
@@ -22,6 +24,8 @@ class GenerationJobResponse(BaseModel):
     progress_percent: int
     current_step: str
     error_message: Optional[str] = None
+    product_name: Optional[str] = None
+    product_image: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
+    # Firebase Admin Configuration
+    FIREBASE_PROJECT_ID: str = "omnistage-ai"
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env", "../../.env"),
         env_file_encoding="utf-8",

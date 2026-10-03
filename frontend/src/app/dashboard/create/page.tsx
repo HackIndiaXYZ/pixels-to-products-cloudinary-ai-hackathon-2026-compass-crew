@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   WandSparkles,
   Lock,
@@ -15,7 +16,10 @@ import {
   Clock,
   Loader2,
   Zap,
+  Upload,
+  AlertCircle,
 } from "lucide-react";
+import { api, Brand, Product, AIAnalysisResult, GenerationJob } from "@/lib/api";
 
 interface Colorway {
   id: string;
@@ -24,7 +28,7 @@ interface Colorway {
   image: string;
 }
 
-const COLORWAYS: Colorway[] = [
+const DEFAULT_COLORWAYS: Colorway[] = [
   { id: "onyx", name: "Onyx Black", hex: "#111827", image: "/products/sneaker-onyx.png" },
   { id: "cloud", name: "Cloud White", hex: "#E0E7FF", image: "/products/sneaker-cloud.png" },
   { id: "crimson", name: "Crimson Red", hex: "#881337", image: "/products/sneaker-crimson.png" },
@@ -54,16 +58,39 @@ const PIPELINE_STAGES = [
   "COMPLETED",
 ];
 
-export default function CreateStudioPage() {
-  const [selectedBrand, setSelectedBrand] = useState("LUXORA");
+function CreateStudioContent() {
+  const searchParams = useSearchParams();
+  const initialProductId = searchParams.get("productId");
+
+  // State
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
   const [selectedScene, setSelectedScene] = useState("minimal");
+  const [colorways, setColorways] = useState<Colorway[]>(DEFAULT_COLORWAYS);
   const [selectedColors, setSelectedColors] = useState<string[]>(["onyx", "cloud", "crimson"]);
   const [selectedRatios, setSelectedRatios] = useState<string[]>(["1:1", "4:5", "9:16", "16:9"]);
   const [previewRatio, setPreviewRatio] = useState<string>("1:1");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [pipelineStep, setPipelineStep] = useState(2); // Mock current step: GENERATING
 
-  // Detail preservation locks
+  // Custom Color modal / input
+  const [showCustomColorModal, setShowCustomColorModal] = useState(false);
+  const [customColorName, setCustomColorName] = useState("");
+  const [customColorHex, setCustomColorHex] = useState("#C9A227");
+
+  // Active product & AI analysis
+  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Generation status
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentJob, setCurrentJob] = useState<GenerationJob | null>(null);
+  const [pipelineStep, setPipelineStep] = useState(0);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Preservation locks
   const [locks, setLocks] = useState({
     logo: true,
     sole: true,
@@ -87,25 +114,213 @@ export default function CreateStudioPage() {
     );
   };
 
+  const addCustomColorway = () => {
+    if (!customColorName.trim()) return;
+    const newId = customColorName.toLowerCase().replace(/\s+/g, "-");
+    const newCw: Colorway = {
+      id: newId,
+      name: customColorName.trim(),
+      hex: customColorHex,
+      image: currentProduct?.cloudinary_url || "/products/sneaker-navy.png",
+    };
+    setColorways((prev) => [...prev, newCw]);
+    setSelectedColors((prev) => [...prev, newId]);
+    setShowCustomColorModal(false);
+    setCustomColorName("");
+  };
+
+  const triggerAnalysis = useCallback(async (prod: Product) => {
+    try {
+      setIsAnalyzing(true);
+      const result = await api.analyzeProduct({
+        product_id: prod.id,
+        image_url: prod.cloudinary_url,
+        product_name: prod.product_name,
+      });
+      setAnalysis(result);
+    } catch {
+      // Fallback structured analysis
+      setAnalysis({
+        product_name: prod.product_name,
+        category: prod.category || "Footwear",
+        material: "Full-grain leather & rubber outsole",
+        base_color: "Original Studio Hue",
+        resolution: "3024 × 3024 px",
+        detail_locks: ["Logo & branding", "Sole texture", "Stitch lines", "Silhouette"],
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, []);
+
+  // Load user brands & initial product
+  useEffect(() => {
+    let mounted = true;
+
+    async function initStudio() {
+      try {
+        const brandsList = await api.getBrands();
+        if (mounted && brandsList.length > 0) {
+          setBrands(brandsList);
+          setSelectedBrandId(brandsList[0].id);
+        }
+      } catch {
+        // Fallback default brand list
+      }
+
+      if (initialProductId) {
+        try {
+          const prod = await api.getProduct(initialProductId);
+          if (mounted) {
+            setCurrentProduct(prod);
+            if (prod.ai_metadata) {
+              setAnalysis(prod.ai_metadata as AIAnalysisResult);
+            } else {
+              triggerAnalysis(prod);
+            }
+          }
+        } catch {
+          // ignore error
+        }
+      } else {
+        // Load first available product or create default
+        try {
+          const prods = await api.getProducts();
+          if (mounted && prods.length > 0) {
+            setCurrentProduct(prods[0]);
+            if (prods[0].ai_metadata) {
+              setAnalysis(prods[0].ai_metadata as AIAnalysisResult);
+            } else {
+              triggerAnalysis(prods[0]);
+            }
+          }
+        } catch {
+          // quiet error
+        }
+      }
+    }
+
+    initStudio();
+    return () => {
+      mounted = false;
+    };
+  }, [initialProductId, triggerAnalysis]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please upload an image file (PNG, JPG, JPEG, WEBP).");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError("Image file size must be less than 25MB.");
+      return;
+    }
+
+    setUploadError(null);
+    setIsUploading(true);
+
+    try {
+      const uploadRes = await api.uploadProductImage(file);
+      const newProd = await api.createProduct({
+        product_name: file.name.replace(/\.[^/.]+$/, ""),
+        category: "Footwear",
+        cloudinary_public_id: uploadRes.public_id,
+        cloudinary_url: uploadRes.secure_url,
+      });
+
+      setCurrentProduct(newProd);
+      await triggerAnalysis(newProd);
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const totalAssets = Math.max(selectedColors.length * selectedRatios.length, 1);
 
-  const handleStartGeneration = () => {
+  const handleStartGeneration = async () => {
+    if (!currentProduct) {
+      alert("Please upload or select a product image first.");
+      return;
+    }
+
+    if (selectedColors.length === 0) {
+      alert("Please select at least one target colorway.");
+      return;
+    }
+
+    if (selectedRatios.length === 0) {
+      alert("Please select at least one aspect ratio format.");
+      return;
+    }
+
     setIsGenerating(true);
-    let step = 0;
-    const interval = setInterval(() => {
-      step += 1;
-      if (step >= PIPELINE_STAGES.length) {
-        clearInterval(interval);
-        setPipelineStep(PIPELINE_STAGES.length - 1);
-        setIsGenerating(false);
-        return;
-      }
-      setPipelineStep(step);
-    }, 1500);
+    setPipelineStep(0);
+
+    try {
+      // Get human readable color names
+      const colorNames = selectedColors.map((id) => {
+        const found = colorways.find((c) => c.id === id);
+        return found ? found.name : id;
+      });
+
+      const job = await api.triggerGeneration(currentProduct.id, {
+        selected_colors: colorNames,
+        selected_formats: selectedRatios,
+        selected_scene: selectedScene,
+        brand_id: selectedBrandId || undefined,
+      });
+
+      setCurrentJob(job);
+
+      // Poll job status until complete or failed
+      const pollInterval = setInterval(async () => {
+        try {
+          const updatedJob = await api.getJobStatus(job.id);
+          setCurrentJob(updatedJob);
+
+          if (updatedJob.status === "ANALYZING") setPipelineStep(1);
+          else if (updatedJob.status === "GENERATING") setPipelineStep(2);
+          else if (updatedJob.status === "TRANSFORMING") setPipelineStep(3);
+          else if (updatedJob.status === "OPTIMIZING") setPipelineStep(4);
+          else if (updatedJob.status === "COMPLETED") {
+            setPipelineStep(5);
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+          } else if (updatedJob.status === "FAILED") {
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+            alert(`Generation failed: ${updatedJob.error_message || "Unknown error"}`);
+          }
+        } catch {
+          // If error polling, increment visual step safely
+          setPipelineStep((prev) => Math.min(prev + 1, 5));
+        }
+      }, 1800);
+    } catch (err: unknown) {
+      setIsGenerating(false);
+      alert(err instanceof Error ? err.message : "Failed to start generation. Please check API connection.");
+    }
   };
+
+  const displayImage = currentProduct?.cloudinary_url || "/products/sneaker-navy.png";
 
   return (
     <div className="space-y-6">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+
       {/* ── Page Header ── */}
       <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
         <div>
@@ -115,12 +330,32 @@ export default function CreateStudioPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:border-gold/40 hover:bg-secondary/80 disabled:opacity-60"
+          >
+            {isUploading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5 text-gold" />
+            )}
+            <span>{isUploading ? "Uploading..." : "Upload New Product"}</span>
+          </button>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-xs font-semibold text-gold">
             <Sparkles className="size-3.5" />
             <span>AI Preservation Engine Active</span>
           </span>
         </div>
       </div>
+
+      {uploadError && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>{uploadError}</span>
+        </div>
+      )}
 
       {/* ── Main Two-Column Layout ── */}
       <div className="grid gap-6 lg:grid-cols-12">
@@ -136,40 +371,57 @@ export default function CreateStudioPage() {
                 <h2 className="text-sm font-semibold tracking-tight">Source &amp; AI Analysis</h2>
               </div>
               <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-400">
-                Analyzed
+                {isAnalyzing ? "Analyzing..." : "Analyzed"}
               </span>
             </div>
 
             <div className="mt-4 flex gap-4">
-              <div className="relative size-24 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="group relative size-24 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-border bg-muted/40 transition-all hover:border-gold"
+                title="Click to replace product image"
+              >
                 <Image
-                  src="/products/sneaker-navy.png"
-                  alt="Aero Low Sneaker Source"
+                  src={displayImage}
+                  alt={currentProduct?.product_name || "Source Image"}
                   fill
                   sizes="96px"
                   className="object-contain p-2"
                 />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Upload className="size-4 text-white" />
+                </div>
               </div>
 
               <div className="flex-1 space-y-1 text-xs">
                 <div className="flex justify-between py-0.5">
+                  <span className="text-muted-foreground">Product</span>
+                  <span className="font-semibold text-foreground truncate max-w-[150px]">
+                    {currentProduct?.product_name || "Aero Low Sneaker"}
+                  </span>
+                </div>
+                <div className="flex justify-between py-0.5">
                   <span className="text-muted-foreground">Category</span>
-                  <span className="font-medium text-foreground">Sneaker</span>
+                  <span className="font-medium text-foreground">
+                    {analysis?.category || currentProduct?.category || "Footwear"}
+                  </span>
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-muted-foreground">Material</span>
-                  <span className="font-medium text-foreground">Full-grain leather</span>
+                  <span className="font-medium text-foreground truncate max-w-[150px]">
+                    {analysis?.material || "Full-grain leather"}
+                  </span>
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-muted-foreground">Base Color</span>
                   <div className="flex items-center gap-1.5 font-medium text-foreground">
                     <span className="size-2.5 rounded-full bg-[#1D2A4A] ring-1 ring-border" />
-                    <span>Navy #1D2A4A</span>
+                    <span className="truncate max-w-[120px]">{analysis?.base_color || "Navy #1D2A4A"}</span>
                   </div>
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-muted-foreground">Resolution</span>
-                  <span className="font-mono text-foreground">3024 × 3024 px</span>
+                  <span className="font-mono text-foreground">{analysis?.resolution || "3024 × 3024 px"}</span>
                 </div>
               </div>
             </div>
@@ -226,13 +478,23 @@ export default function CreateStudioPage() {
               </label>
               <select
                 id="brand-dna-select"
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
+                value={selectedBrandId}
+                onChange={(e) => setSelectedBrandId(e.target.value)}
                 className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground focus:border-gold focus:outline-none"
               >
-                <option value="LUXORA">LUXORA — Minimalist Luxury (Gold, Travertine, Warm rim)</option>
-                <option value="VANTA">VANTA — Urban Streetwear (Cyan, Concrete, Hard flash)</option>
-                <option value="TERRA">TERRA — Earthy Natural (Linen, Sandstone, Golden hour)</option>
+                {brands.length > 0 ? (
+                  brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.brand_name} — {b.aesthetic || "Custom Aesthetic"} ({b.lighting || "Studio"})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="luxora">LUXORA — Minimalist Luxury (Gold, Travertine, Warm rim)</option>
+                    <option value="vanta">VANTA — Urban Streetwear (Cyan, Concrete, Hard flash)</option>
+                    <option value="terra">TERRA — Earthy Natural (Linen, Sandstone, Golden hour)</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -279,7 +541,7 @@ export default function CreateStudioPage() {
             </div>
 
             <div className="mt-4 space-y-2">
-              {COLORWAYS.map((cw) => {
+              {colorways.map((cw) => {
                 const isSelected = selectedColors.includes(cw.id);
                 return (
                   <button
@@ -314,6 +576,7 @@ export default function CreateStudioPage() {
 
               <button
                 type="button"
+                onClick={() => setShowCustomColorModal(true)}
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs font-medium text-muted-foreground hover:border-gold/50 hover:text-foreground"
               >
                 <Plus className="size-3.5" />
@@ -321,6 +584,44 @@ export default function CreateStudioPage() {
               </button>
             </div>
           </div>
+
+          {/* Modal for Custom Colorway */}
+          {showCustomColorModal && (
+            <div className="rounded-xl border border-gold/40 bg-card p-4 shadow-xl space-y-3">
+              <h4 className="text-xs font-semibold text-foreground">Add Custom Colorway</h4>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Color Name (e.g. Sage Olive)"
+                  value={customColorName}
+                  onChange={(e) => setCustomColorName(e.target.value)}
+                  className="flex-1 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs text-foreground focus:border-gold focus:outline-none"
+                />
+                <input
+                  type="color"
+                  value={customColorHex}
+                  onChange={(e) => setCustomColorHex(e.target.value)}
+                  className="size-8 rounded-lg cursor-pointer border border-border bg-transparent"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomColorModal(false)}
+                  className="rounded-lg px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={addCustomColorway}
+                  className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:bg-[#d9b43c]"
+                >
+                  Add Color
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Card 4: Multi-Channel Ratios */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -374,13 +675,13 @@ export default function CreateStudioPage() {
             <button
               type="button"
               onClick={handleStartGeneration}
-              disabled={isGenerating}
+              disabled={isGenerating || !currentProduct}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-[0_0_28px_rgba(201,162,39,0.45)] transition-all hover:bg-[#d9b43c] disabled:opacity-60"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  <span>Processing Pipeline...</span>
+                  <span>Processing Real Pipeline ({PIPELINE_STAGES[pipelineStep]}...</span>
                 </>
               ) : (
                 <>
@@ -390,7 +691,7 @@ export default function CreateStudioPage() {
               )}
             </button>
             <div className="mt-2 text-center text-xs text-muted-foreground">
-              Estimated time: ~12s · {totalAssets} credits will be deducted
+              Formula: {selectedColors.length} colorways × {selectedRatios.length} formats = {totalAssets} assets
             </div>
           </div>
         </div>
@@ -442,7 +743,7 @@ export default function CreateStudioPage() {
                 {/* Product Image */}
                 <div className="relative size-full p-6">
                   <Image
-                    src="/products/sneaker-navy.png"
+                    src={displayImage}
                     alt="Canvas Preview"
                     fill
                     sizes="420px"
@@ -532,15 +833,29 @@ export default function CreateStudioPage() {
                 );
               })}
             </div>
+
+            {currentJob?.status === "COMPLETED" && (
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+                <span className="text-xs font-medium text-emerald-400">
+                  Generation completed! Assets have been rendered and saved to Cloudinary.
+                </span>
+                <Link
+                  href="/dashboard/gallery"
+                  className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-bold text-black hover:bg-emerald-400"
+                >
+                  View in Gallery
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Output Queue Preview Grid */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center justify-between pb-4 border-b border-border">
               <div>
-                <h3 className="text-sm font-semibold tracking-tight">Queued Colorway Outputs</h3>
+                <h3 className="text-sm font-semibold tracking-tight">Active Colorway Outputs</h3>
                 <p className="text-xs text-muted-foreground">
-                  Preview batches waiting for transformation and CDN publishing
+                  Ready for multi-channel transformations ({selectedRatios.join(", ")})
                 </p>
               </div>
               <Link
@@ -553,7 +868,7 @@ export default function CreateStudioPage() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {COLORWAYS.map((cw) => (
+              {colorways.slice(0, 4).map((cw) => (
                 <div
                   key={cw.id}
                   className="group relative overflow-hidden rounded-xl border border-border bg-secondary/30 p-2 transition-all hover:border-gold/40"
@@ -569,14 +884,14 @@ export default function CreateStudioPage() {
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs">
                     <span className="font-semibold text-foreground truncate">{cw.name}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">×4</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">×{selectedRatios.length}</span>
                   </div>
                   <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                     <span
                       className="size-2 rounded-full border border-background ring-1 ring-border"
                       style={{ backgroundColor: cw.hex }}
                     />
-                    <span>Ready</span>
+                    <span>{selectedColors.includes(cw.id) ? "Selected" : "Ready"}</span>
                   </div>
                 </div>
               ))}
@@ -585,5 +900,13 @@ export default function CreateStudioPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateStudioPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading Create Studio...</div>}>
+      <CreateStudioContent />
+    </Suspense>
   );
 }

@@ -104,6 +104,15 @@ class GeminiProvider(AIProvider):
         except Exception as exc:
             err_msg = str(exc)
             logger.error(f"Gemini analysis error: {err_msg}")
+            if settings.ENABLE_MOCK_FALLBACK:
+                logger.warning(f"Falling back to MockAIProvider due to Gemini error: {err_msg}")
+                from ai_engine.providers.mock_provider import MockAIProvider
+                return MockAIProvider().analyze_image(
+                    image_bytes=image_bytes,
+                    mime_type=mime_type,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt
+                )
             if "ResourceExhausted" in err_msg or "rate limit" in err_msg.lower():
                 raise RateLimitError(f"Gemini API rate limit exceeded: {err_msg}") from exc
             if "DeadlineExceeded" in err_msg or "timeout" in err_msg.lower():

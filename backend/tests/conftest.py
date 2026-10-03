@@ -5,11 +5,13 @@ import sys
 import pytest
 
 # Ensure backend and root directory are in python path
-root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-backend_path = os.path.join(root_path, "backend")
-for p in [backend_path, root_path]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if root_path in sys.path:
+    sys.path.remove(root_path)
+sys.path.append(root_path)
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -33,8 +35,12 @@ def setup_test_db():
     Base.metadata.create_all(bind=test_engine)
     yield
     Base.metadata.drop_all(bind=test_engine)
+    test_engine.dispose()
     if os.path.exists("./test_omnistage.db"):
-        os.remove("./test_omnistage.db")
+        try:
+            os.remove("./test_omnistage.db")
+        except OSError:
+            pass
 
 
 @pytest.fixture

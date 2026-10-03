@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   Download,
@@ -9,7 +10,11 @@ import {
   Check,
   CheckSquare,
   Square,
+  Loader2,
+  Eye,
+  X,
 } from "lucide-react";
+import { api, Asset } from "@/lib/api";
 
 interface GalleryAsset {
   id: string;
@@ -24,7 +29,7 @@ interface GalleryAsset {
   cdnUrl: string;
 }
 
-const ASSETS: GalleryAsset[] = [
+const DEFAULT_ASSETS: GalleryAsset[] = [
   {
     id: "ast-1",
     name: "Aero Low Sneaker",
@@ -35,7 +40,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1080",
     size: "142 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/luxora/aero-low-navy.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/omnistage/products/sneaker-navy.webp",
   },
   {
     id: "ast-2",
@@ -47,7 +52,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1350",
     size: "98 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1350/v1/luxora/aero-low-navy-feed.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1350/v1/omnistage/products/sneaker-navy.webp",
   },
   {
     id: "ast-3",
@@ -59,7 +64,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1920",
     size: "76 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1920/v1/luxora/aero-low-onyx-story.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1920/v1/omnistage/products/sneaker-onyx.webp",
   },
   {
     id: "ast-4",
@@ -71,7 +76,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1920 × 1080",
     size: "188 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1920,h_1080/v1/luxora/aero-low-crimson-banner.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1920,h_1080/v1/omnistage/products/sneaker-crimson.webp",
   },
   {
     id: "ast-5",
@@ -83,7 +88,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1080",
     size: "120 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/luxora/maison-bag-sandstone.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/omnistage/products/handbag.webp",
   },
   {
     id: "ast-6",
@@ -95,7 +100,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1350",
     size: "88 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1350/v1/luxora/maison-bag-feed.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1350/v1/omnistage/products/handbag.webp",
   },
   {
     id: "ast-7",
@@ -107,7 +112,7 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1080",
     size: "156 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/luxora/meridian-watch.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/omnistage/products/watch.webp",
   },
   {
     id: "ast-8",
@@ -119,86 +124,134 @@ const ASSETS: GalleryAsset[] = [
     dimensions: "1080 × 1920",
     size: "110 KB",
     format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1920/v1/luxora/meridian-watch-story.webp",
-  },
-  {
-    id: "ast-9",
-    name: "Aero Low Sneaker",
-    sku: "LX-SNK-042",
-    ratio: "1:1",
-    colorway: "Cloud White",
-    image: "/products/sneaker-cloud.png",
-    dimensions: "1080 × 1080",
-    size: "134 KB",
-    format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/luxora/aero-low-cloud.webp",
-  },
-  {
-    id: "ast-10",
-    name: "Aero Low Sneaker",
-    sku: "LX-SNK-043",
-    ratio: "4:5",
-    colorway: "Desert Sand",
-    image: "/products/sneaker-sand.png",
-    dimensions: "1080 × 1350",
-    size: "115 KB",
-    format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1350/v1/luxora/aero-low-sand-feed.webp",
-  },
-  {
-    id: "ast-11",
-    name: "Aero Low Sneaker",
-    sku: "LX-SNK-043",
-    ratio: "1:1",
-    colorway: "Desert Sand",
-    image: "/products/sneaker-sand.png",
-    dimensions: "1080 × 1080",
-    size: "145 KB",
-    format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1080,h_1080/v1/luxora/aero-low-sand.webp",
-  },
-  {
-    id: "ast-12",
-    name: "Aero Low Sneaker",
-    sku: "LX-SNK-044",
-    ratio: "16:9",
-    colorway: "Onyx Black",
-    image: "/products/sneaker-onyx.png",
-    dimensions: "1920 × 1080",
-    size: "201 KB",
-    format: "WebP",
-    cdnUrl: "https://res.cloudinary.com/omnistage/image/upload/f_auto,q_auto,c_pad,w_1920,h_1080/v1/luxora/aero-low-onyx-banner.webp",
+    cdnUrl: "https://res.cloudinary.com/x6kxm6nz/image/upload/f_auto,q_auto,c_pad,w_1080,h_1920/v1/omnistage/products/watch.webp",
   },
 ];
 
-export default function GalleryPage() {
-  const [selectedRatio, setSelectedRatio] = useState<string>("All");
+function GalleryContent() {
+  const searchParams = useSearchParams();
+  const filterJobId = searchParams.get("jobId");
+
+  const [assets, setAssets] = useState<GalleryAsset[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedRatio, setSelectedRatio] = useState<string>("All");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<GalleryAsset | null>(null);
 
   const ratios = ["All", "1:1", "4:5", "9:16", "16:9"];
 
-  const filteredAssets = ASSETS.filter((a) => {
-    const matchesRatio = selectedRatio === "All" || a.ratio === selectedRatio;
-    const matchesSearch =
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.colorway.toLowerCase().includes(search.toLowerCase()) ||
-      a.sku.toLowerCase().includes(search.toLowerCase());
-    return matchesRatio && matchesSearch;
-  });
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadAssets() {
+      try {
+        let fetched: Asset[] = [];
+        if (filterJobId) {
+          fetched = await api.getJobAssets(filterJobId);
+        } else {
+          fetched = await api.getAssets();
+        }
+
+        if (mounted) {
+          if (fetched && fetched.length > 0) {
+            const mapped: GalleryAsset[] = fetched.map((a, i) => {
+              const dims =
+                a.format === "1:1"
+                  ? "1080 × 1080"
+                  : a.format === "4:5"
+                  ? "1080 × 1350"
+                  : a.format === "9:16"
+                  ? "1080 × 1920"
+                  : "1920 × 1080";
+
+              return {
+                id: a.id,
+                name: `Product Asset ${i + 1}`,
+                sku: `LX-GEN-0${i + 1}`,
+                ratio: ["1:1", "4:5", "9:16", "16:9"].includes(a.format)
+                  ? (a.format as GalleryAsset["ratio"])
+                  : "1:1",
+                colorway: a.colorway || "Standard Colorway",
+                image: a.cloudinary_url,
+                dimensions: dims,
+                size: "112 KB",
+                format: "WebP",
+                cdnUrl: a.cloudinary_url,
+              };
+            });
+            setAssets(mapped);
+          } else {
+            setAssets(DEFAULT_ASSETS);
+          }
+        }
+      } catch {
+        if (mounted) setAssets(DEFAULT_ASSETS);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadAssets();
+    return () => {
+      mounted = false;
+    };
+  }, [filterJobId]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  const handleCopy = (id: string, text: string) => {
-    setCopiedId(id);
-    navigator.clipboard?.writeText(text);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = (id: string, cdnUrl: string) => {
+    navigator.clipboard.writeText(cdnUrl).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(() => {
+      // Fallback
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
+
+  const handleDownload = async (asset: GalleryAsset) => {
+    try {
+      const response = await fetch(asset.image);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${asset.name.toLowerCase().replace(/\s+/g, "-")}-${asset.colorway.toLowerCase()}-${asset.ratio.replace(":", "-")}.webp`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      window.open(asset.image, "_blank");
+    }
+  };
+
+  const handleBulkExport = () => {
+    const toExport = assets.filter((a) => selectedIds.includes(a.id));
+    if (toExport.length === 0) {
+      alert("Please select at least one asset to export.");
+      return;
+    }
+    toExport.forEach((asset, idx) => {
+      setTimeout(() => handleDownload(asset), idx * 250);
+    });
+  };
+
+  const filteredAssets = assets.filter((asset) => {
+    const matchesRatio = selectedRatio === "All" || asset.ratio === selectedRatio;
+    const matchesSearch =
+      asset.name.toLowerCase().includes(search.toLowerCase()) ||
+      asset.colorway.toLowerCase().includes(search.toLowerCase()) ||
+      asset.sku.toLowerCase().includes(search.toLowerCase());
+    return matchesRatio && matchesSearch;
+  });
 
   return (
     <div className="space-y-8">
@@ -213,6 +266,7 @@ export default function GalleryPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={handleBulkExport}
             className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary px-3.5 py-2 text-xs font-semibold text-foreground transition-colors hover:border-gold/40 hover:bg-secondary/80"
           >
             <Download className="size-3.5" />
@@ -252,103 +306,191 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {/* ── Masonry Column Layout ── */}
-      <ul className="columns-2 gap-4 sm:columns-3 xl:columns-4 [&>li]:mb-4 list-none p-0 m-0">
-        {filteredAssets.map((asset) => {
-          const isSelected = selectedIds.includes(asset.id);
-          const isCopied = copiedId === asset.id;
+      {loading ? (
+        <div className="py-12 text-center text-xs text-muted-foreground">
+          <Loader2 className="mx-auto size-6 animate-spin text-gold mb-2" />
+          <span>Loading assets from Cloudinary CDN...</span>
+        </div>
+      ) : filteredAssets.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-12 text-center text-xs text-muted-foreground">
+          No assets found matching the selected filters.
+        </div>
+      ) : (
+        /* ── Masonry Column Layout ── */
+        <ul className="columns-2 gap-4 sm:columns-3 xl:columns-4 [&>li]:mb-4 list-none p-0 m-0">
+          {filteredAssets.map((asset) => {
+            const isSelected = selectedIds.includes(asset.id);
+            const isCopied = copiedId === asset.id;
 
-          return (
-            <li
-              key={asset.id}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-card p-3 shadow-sm transition-all hover:border-gold/40 hover:shadow-lg"
-            >
-              {/* Image Container with appropriate aspect ratio preview */}
-              <div
-                className={`relative w-full overflow-hidden rounded-xl border border-border/80 bg-background/50 ${
-                  asset.ratio === "1:1"
-                    ? "aspect-square"
-                    : asset.ratio === "4:5"
-                    ? "aspect-[4/5]"
-                    : asset.ratio === "9:16"
-                    ? "aspect-[9/16]"
-                    : "aspect-[16/9]"
-                }`}
+            return (
+              <li
+                key={asset.id}
+                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-3 shadow-sm transition-all hover:border-gold/40 hover:shadow-lg"
               >
-                <Image
-                  src={asset.image}
-                  alt={`${asset.name} - ${asset.colorway}`}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-3 transition-transform duration-300 group-hover:scale-105"
-                />
+                {/* Image Container */}
+                <div
+                  className={`relative w-full cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-background/50 ${
+                    asset.ratio === "1:1"
+                      ? "aspect-square"
+                      : asset.ratio === "4:5"
+                      ? "aspect-[4/5]"
+                      : asset.ratio === "9:16"
+                      ? "aspect-[9/16]"
+                      : "aspect-[16/9]"
+                  }`}
+                  onClick={() => setPreviewAsset(asset)}
+                >
+                  <Image
+                    src={asset.image}
+                    alt={`${asset.name} - ${asset.colorway}`}
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+                  />
 
-                {/* Ratio Tag */}
-                <div className="absolute top-2.5 left-2.5">
-                  <span className="rounded-md border border-white/10 bg-background/80 px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground backdrop-blur-md">
-                    {asset.ratio}
-                  </span>
+                  {/* Ratio Tag */}
+                  <div className="absolute top-2.5 left-2.5">
+                    <span className="rounded-md border border-white/10 bg-background/80 px-2 py-0.5 font-mono text-[10px] font-semibold text-foreground backdrop-blur-md">
+                      {asset.ratio}
+                    </span>
+                  </div>
+
+                  {/* Preview Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Eye className="size-5 text-white" />
+                  </div>
+
+                  {/* Selection Checkbox */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(asset.id);
+                    }}
+                    className="absolute top-2.5 right-2.5 flex size-6 items-center justify-center rounded-md border border-white/20 bg-background/80 text-foreground backdrop-blur-md hover:border-gold"
+                    aria-label="Select asset"
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="size-4 text-gold" />
+                    ) : (
+                      <Square className="size-4 text-muted-foreground" />
+                    )}
+                  </button>
                 </div>
 
-                {/* Selection Checkbox */}
+                {/* Meta details */}
+                <div className="mt-3 space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-foreground truncate">{asset.name}</span>
+                    <span className="font-mono text-muted-foreground">{asset.size}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>{asset.colorway}</span>
+                    <span className="font-mono">{asset.dimensions}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-3 flex items-center gap-1.5 border-t border-border pt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(asset.id, asset.cdnUrl)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-secondary py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="size-3 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">CDN URL copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3 text-muted-foreground" />
+                        <span>Copy CDN URL</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(asset)}
+                    className="flex size-7 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    title="Download asset"
+                    aria-label="Download asset"
+                  >
+                    <Download className="size-3" />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* ── Asset Preview Modal ── */}
+      {previewAsset && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewAsset(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <h3 className="text-base font-bold text-foreground">{previewAsset.name}</h3>
+                <p className="text-xs text-muted-foreground">{previewAsset.colorway} · {previewAsset.ratio} ({previewAsset.dimensions})</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewAsset(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="relative h-[420px] w-full bg-background/50 rounded-xl overflow-hidden border border-border">
+              <Image
+                src={previewAsset.image}
+                alt={previewAsset.name}
+                fill
+                className="object-contain p-4"
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <span className="font-mono text-xs text-muted-foreground truncate max-w-[340px]">
+                {previewAsset.cdnUrl}
+              </span>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => toggleSelect(asset.id)}
-                  className="absolute top-2.5 right-2.5 flex size-6 items-center justify-center rounded-md border border-white/20 bg-background/80 text-foreground backdrop-blur-md hover:border-gold"
-                  aria-label="Select asset"
+                  onClick={() => handleCopy(previewAsset.id, previewAsset.cdnUrl)}
+                  className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
                 >
-                  {isSelected ? (
-                    <CheckSquare className="size-4 text-gold" />
-                  ) : (
-                    <Square className="size-4 text-muted-foreground" />
-                  )}
+                  {copiedId === previewAsset.id ? "CDN URL copied" : "Copy CDN URL"}
                 </button>
-              </div>
-
-              {/* Meta details */}
-              <div className="mt-3 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-semibold text-foreground truncate">{asset.name}</span>
-                  <span className="font-mono text-muted-foreground">{asset.size}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>{asset.colorway}</span>
-                  <span className="font-mono">{asset.dimensions}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-3 flex items-center gap-1.5 border-t border-border pt-2.5">
                 <button
                   type="button"
-                  onClick={() => handleCopy(asset.id, asset.cdnUrl)}
-                  className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-secondary py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+                  onClick={() => handleDownload(previewAsset)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-[#d9b43c]"
                 >
-                  {isCopied ? (
-                    <>
-                      <Check className="size-3 text-emerald-400" />
-                      <span className="text-emerald-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="size-3 text-muted-foreground" />
-                      <span>CDN URL</span>
-                    </>
-                  )}
+                  <Download className="size-3.5" />
+                  <span>Download</span>
                 </button>
-                <a
-                  href={asset.image}
-                  download
-                  className="flex size-7 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label="Download asset"
-                >
-                  <Download className="size-3" />
-                </a>
               </div>
-            </li>
-          );
-        })}
-      </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function GalleryPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading Asset Gallery...</div>}>
+      <GalleryContent />
+    </Suspense>
   );
 }

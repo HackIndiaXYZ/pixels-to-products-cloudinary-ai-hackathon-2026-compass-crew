@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "OmniStage AI — One Product Photo. Every Channel.",
@@ -23,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark bg-[#0a0d14]">
       <body className="antialiased bg-[#0a0d14] text-[#eef2f7] min-h-screen">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

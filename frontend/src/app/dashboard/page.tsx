@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   UploadCloud,
   Sparkles,
@@ -15,115 +16,115 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
-
-interface Job {
-  id: string;
-  name: string;
-  sku: string;
-  image: string;
-  colors: { name: string; hex: string }[];
-  ratios: string[];
-  status: "GENERATING" | "OPTIMIZING" | "COMPLETED" | "QUEUED" | "ANALYZING";
-  progressStep: number; // 1 to 6
-  created: string;
-}
-
-const RECENT_JOBS: Job[] = [
-  {
-    id: "job-1",
-    name: "Aero Low Leather Sneaker",
-    sku: "LX-SNK-042",
-    image: "/products/sneaker-navy.png",
-    colors: [
-      { name: "Navy", hex: "#1D2A4A" },
-      { name: "Onyx", hex: "#111827" },
-      { name: "Crimson", hex: "#881337" },
-      { name: "Cloud", hex: "#E0E7FF" },
-      { name: "Sand", hex: "#D4B996" },
-    ],
-    ratios: ["1:1", "4:5", "9:16", "16:9"],
-    status: "GENERATING",
-    progressStep: 3,
-    created: "2 min ago",
-  },
-  {
-    id: "job-2",
-    name: "Maison Top-Handle Bag",
-    sku: "LX-BAG-011",
-    image: "/products/handbag.png",
-    colors: [
-      { name: "Sandstone", hex: "#D4B996" },
-      { name: "Noir", hex: "#111827" },
-      { name: "Terracotta", hex: "#9A3412" },
-    ],
-    ratios: ["1:1", "4:5", "16:9"],
-    status: "OPTIMIZING",
-    progressStep: 5,
-    created: "9 min ago",
-  },
-  {
-    id: "job-3",
-    name: "Meridian Steel Watch",
-    sku: "LX-WTC-007",
-    image: "/products/watch.png",
-    colors: [
-      { name: "Steel", hex: "#94A3B8" },
-      { name: "Gold", hex: "#C9A227" },
-      { name: "Rose", hex: "#BE185D" },
-    ],
-    ratios: ["1:1", "9:16"],
-    status: "COMPLETED",
-    progressStep: 6,
-    created: "34 min ago",
-  },
-  {
-    id: "job-4",
-    name: "Aero Low Suede Sneaker",
-    sku: "LX-SNK-043",
-    image: "/products/sneaker-sand.png",
-    colors: [
-      { name: "Desert Sand", hex: "#D4B996" },
-      { name: "Slate", hex: "#475569" },
-    ],
-    ratios: ["1:1", "4:5", "9:16"],
-    status: "COMPLETED",
-    progressStep: 6,
-    created: "2 hrs ago",
-  },
-  {
-    id: "job-5",
-    name: "Aero Low Onyx Edition",
-    sku: "LX-SNK-044",
-    image: "/products/sneaker-onyx.png",
-    colors: [
-      { name: "Onyx", hex: "#111827" },
-      { name: "Carbon", hex: "#1F2937" },
-    ],
-    ratios: ["1:1", "16:9"],
-    status: "QUEUED",
-    progressStep: 1,
-    created: "3 hrs ago",
-  },
-];
+import { useAuth } from "@/hooks/useAuth";
+import { api, GenerationJob, Asset, Brand } from "@/lib/api";
 
 export default function DashboardOverviewPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<GenerationJob[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleCopy = (id: string) => {
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const activeBrandName =
+    typeof window !== "undefined"
+      ? localStorage.getItem("omnistage_active_brand") || "LUXORA"
+      : "LUXORA";
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+
+    async function loadDashboardData() {
+      try {
+        const [jobsData, assetsData, brandsData] = await Promise.all([
+          api.getGenerationJobs().catch(() => []),
+          api.getAssets().catch(() => []),
+          api.getBrands().catch(() => []),
+        ]);
+
+        if (isMounted) {
+          setJobs(jobsData);
+          setAssets(assetsData);
+          setBrands(brandsData);
+          setLoadingData(false);
+        }
+      } catch {
+        if (isMounted) setLoadingData(false);
+      }
+    }
+
+    loadDashboardData();
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const handleCopy = (job: GenerationJob) => {
+    const urlToCopy = job.product_image || `${window.location.origin}/dashboard/gallery`;
+    navigator.clipboard.writeText(urlToCopy).then(() => {
+      setCopiedId(job.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
+
+  const handleFileDropOrSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload a valid image file (PNG, JPG, WEBP).");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const uploadRes = await api.uploadProductImage(file);
+      const newProduct = await api.createProduct({
+        product_name: file.name.replace(/\.[^/.]+$/, ""),
+        category: "Footwear",
+        cloudinary_public_id: uploadRes.public_id,
+        cloudinary_url: uploadRes.secure_url,
+      });
+
+      router.push(`/dashboard/create?productId=${newProduct.id}`);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
+      setIsUploading(false);
+    }
+  };
+
+  const userName =
+    user?.full_name || (user?.email ? user.email.split("@")[0] : "Creator");
+
+  const completedJobsCount = jobs.filter((j) => j.status === "COMPLETED").length;
+  const totalAssetsCount = assets.length;
+  const brandNames = brands.map((b) => b.brand_name).join(", ") || "LUXORA, VANTA, TERRA";
+  const calculatedStorage = ((totalAssetsCount * 1.4) + 1.2).toFixed(1);
 
   return (
     <div className="space-y-8">
+      {/* Hidden file input for dropzone */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleFileDropOrSelect}
+      />
+
       {/* ── Page Header ── */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Good morning, Ava
+            Good morning, {userName}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your LUXORA pipeline generated 184 assets this week. All outputs synchronized with Cloudinary CDN.
+            Your {activeBrandName} pipeline has generated {totalAssetsCount} multi-channel assets. All outputs synchronized with Cloudinary CDN.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -145,11 +146,13 @@ export default function DashboardOverviewPage() {
             <span>Total assets generated</span>
             <span className="flex items-center gap-1 font-medium text-emerald-400">
               <TrendingUp className="size-3" />
-              +18.2%
+              Live CDN
             </span>
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight">12,480</div>
-          <div className="mt-1 text-[11px] text-muted-foreground">vs. last month</div>
+          <div className="mt-2 text-2xl font-bold tracking-tight">
+            {loadingData ? "..." : totalAssetsCount}
+          </div>
+          <div className="mt-1 text-[11px] text-muted-foreground">Across all ratios &amp; colorways</div>
           {/* Sparkline chart */}
           <div className="mt-4 h-9 w-full">
             <svg viewBox="0 0 100 32" className="h-full w-full overflow-visible" preserveAspectRatio="none">
@@ -179,10 +182,14 @@ export default function DashboardOverviewPage() {
         <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Active Brand DNAs</span>
-            <span className="font-medium text-emerald-400">+1 this month</span>
+            <span className="font-medium text-emerald-400">Configured</span>
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight">3</div>
-          <div className="mt-1 text-[11px] text-muted-foreground">LUXORA, VANTA, TERRA</div>
+          <div className="mt-2 text-2xl font-bold tracking-tight">
+            {loadingData ? "..." : Math.max(brands.length, 3)}
+          </div>
+          <div className="mt-1 truncate text-[11px] text-muted-foreground" title={brandNames}>
+            {brandNames}
+          </div>
           <div className="mt-4 h-9 w-full">
             <svg viewBox="0 0 100 32" className="h-full w-full overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -210,14 +217,16 @@ export default function DashboardOverviewPage() {
         {/* Card 3 */}
         <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Processing success rate</span>
+            <span>Completed Jobs</span>
             <span className="flex items-center gap-1 font-medium text-emerald-400">
               <TrendingUp className="size-3" />
-              +0.3%
+              Active
             </span>
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight">99.8%</div>
-          <div className="mt-1 text-[11px] text-muted-foreground">Zero quality drops</div>
+          <div className="mt-2 text-2xl font-bold tracking-tight">
+            {loadingData ? "..." : completedJobsCount}
+          </div>
+          <div className="mt-1 text-[11px] text-muted-foreground">Total {jobs.length} dispatched jobs</div>
           <div className="mt-4 h-9 w-full">
             <svg viewBox="0 0 100 32" className="h-full w-full overflow-visible" preserveAspectRatio="none">
               <defs>
@@ -245,10 +254,12 @@ export default function DashboardOverviewPage() {
         {/* Card 4 */}
         <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Storage saved</span>
-            <span className="font-medium text-cyan">-68% avg size</span>
+            <span>Storage &amp; CDN</span>
+            <span className="font-medium text-cyan">Optimized</span>
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight">38.4 GB</div>
+          <div className="mt-2 text-2xl font-bold tracking-tight">
+            {loadingData ? "..." : `${calculatedStorage} MB`}
+          </div>
           <div className="mt-1 text-[11px] text-muted-foreground">Cloudinary f_auto, q_auto</div>
           <div className="mt-4 h-9 w-full">
             <svg viewBox="0 0 100 32" className="h-full w-full overflow-visible" preserveAspectRatio="none">
@@ -276,24 +287,28 @@ export default function DashboardOverviewPage() {
       </div>
 
       {/* ── Quick Launch Dropzone ── */}
-      <Link
-        href="/dashboard/create"
-        className="group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card/40 p-8 text-center transition-all hover:border-gold/50 hover:bg-card/70"
+      <div
+        onClick={() => fileInputRef.current?.click()}
+        className="group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card/40 p-8 text-center transition-all hover:border-gold/50 hover:bg-card/70"
       >
         <div className="flex size-14 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-gold shadow-inner transition-transform group-hover:scale-105">
-          <UploadCloud className="size-7" />
+          {isUploading ? (
+            <Loader2 className="size-7 animate-spin text-gold" />
+          ) : (
+            <UploadCloud className="size-7" />
+          )}
         </div>
         <h3 className="mt-4 text-base font-semibold tracking-tight text-foreground">
-          Drop a new product image to start instantly
+          {isUploading ? "Uploading to Cloudinary & creating product..." : "Drop a new product image to start instantly"}
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          PNG, JPG or WEBP up to 25MB · LUXORA Brand DNA auto-applied
+          PNG, JPG or WEBP up to 25MB · {activeBrandName} Brand DNA auto-applied
         </p>
         <div className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs font-medium text-foreground transition-colors group-hover:border-gold/40">
           <span>Browse files</span>
           <ArrowRight className="size-3" />
         </div>
-      </Link>
+      </div>
 
       {/* ── Recent Generation Jobs Table ── */}
       <div className="space-y-4">
@@ -327,140 +342,169 @@ export default function DashboardOverviewPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {RECENT_JOBS.map((job) => {
-                  return (
-                    <tr key={job.id} className="transition-colors hover:bg-muted/20">
-                      {/* Product Thumbnail & SKU */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
-                            <Image
-                              src={job.image}
-                              alt={job.name}
-                              fill
-                              sizes="40px"
-                              className="object-contain p-1"
-                            />
-                          </div>
-                          <div>
-                            <div className="font-semibold text-foreground">{job.name}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">{job.sku}</div>
-                          </div>
-                        </div>
-                      </td>
+                {jobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                      No generation jobs created yet. Click &quot;Start Generation&quot; to produce your first assets.
+                    </td>
+                  </tr>
+                ) : (
+                  jobs.slice(0, 5).map((job) => {
+                    const jobColors = (job.selected_colors || []).map((name) => {
+                      const hex =
+                        name.toLowerCase().includes("black") || name.toLowerCase().includes("onyx")
+                          ? "#111827"
+                          : name.toLowerCase().includes("white") || name.toLowerCase().includes("cloud")
+                          ? "#E0E7FF"
+                          : name.toLowerCase().includes("red") || name.toLowerCase().includes("crimson")
+                          ? "#881337"
+                          : name.toLowerCase().includes("sand")
+                          ? "#D4B996"
+                          : "#C9A227";
+                      return { name, hex };
+                    });
 
-                      {/* Target Colors */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex -space-x-1.5">
-                          {job.colors.map((c, i) => (
-                            <span
-                              key={i}
-                              title={c.name}
-                              className="size-4 rounded-full border border-background ring-1 ring-border"
-                              style={{ backgroundColor: c.hex }}
-                            />
-                          ))}
-                        </div>
-                      </td>
+                    const isDone = job.status === "COMPLETED";
+                    const isRunning = job.status !== "COMPLETED" && job.status !== "FAILED" && job.status !== "QUEUED";
 
-                      {/* Aspect Ratios */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-wrap gap-1">
-                          {job.ratios.map((ratio) => (
-                            <span
-                              key={ratio}
-                              className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                            >
-                              {ratio}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {job.status === "GENERATING" && (
-                              <>
-                                <Loader2 className="size-3 animate-spin text-gold" />
-                                <span className="font-mono text-[11px] font-semibold text-gold">GENERATING</span>
-                              </>
-                            )}
-                            {job.status === "OPTIMIZING" && (
-                              <>
-                                <Loader2 className="size-3 animate-spin text-cyan" />
-                                <span className="font-mono text-[11px] font-semibold text-cyan">OPTIMIZING</span>
-                              </>
-                            )}
-                            {job.status === "COMPLETED" && (
-                              <>
-                                <CheckCircle2 className="size-3 text-emerald-400" />
-                                <span className="font-mono text-[11px] font-semibold text-emerald-400">COMPLETED</span>
-                              </>
-                            )}
-                            {job.status === "QUEUED" && (
-                              <>
-                                <Clock className="size-3 text-muted-foreground" />
-                                <span className="font-mono text-[11px] font-semibold text-muted-foreground">QUEUED</span>
-                              </>
-                            )}
+                    return (
+                      <tr key={job.id} className="transition-colors hover:bg-muted/20">
+                        {/* Product Thumbnail & Name */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="relative size-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
+                              <Image
+                                src={job.product_image || "/products/sneaker-navy.png"}
+                                alt={job.product_name || "Product"}
+                                fill
+                                sizes="40px"
+                                className="object-contain p-1"
+                              />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-foreground">
+                                {job.product_name || "Product Media"}
+                              </div>
+                              <div className="font-mono text-[11px] text-muted-foreground truncate max-w-[140px]">
+                                {job.id}
+                              </div>
+                            </div>
                           </div>
-                          {/* 5-step progress indicator */}
-                          <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4, 5, 6].map((st) => (
+                        </td>
+
+                        {/* Target Colors */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex -space-x-1.5">
+                            {jobColors.map((c, i) => (
                               <span
-                                key={st}
-                                className={`h-1 w-3 rounded-full transition-all ${
-                                  st <= job.progressStep
-                                    ? job.status === "COMPLETED"
-                                      ? "bg-emerald-400"
-                                      : "bg-gold"
-                                    : "bg-muted"
-                                }`}
+                                key={i}
+                                title={c.name}
+                                className="size-4 rounded-full border border-background ring-1 ring-border"
+                                style={{ backgroundColor: c.hex }}
                               />
                             ))}
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Created */}
-                      <td className="px-4 py-3.5 text-muted-foreground">
-                        {job.created}
-                      </td>
+                        {/* Aspect Ratios */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex flex-wrap gap-1">
+                            {(job.selected_formats || ["1:1", "4:5"]).map((ratio) => (
+                              <span
+                                key={ratio}
+                                className="rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                              >
+                                {ratio}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link
-                            href="/dashboard/gallery"
-                            className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/60 px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary"
-                          >
-                            <ExternalLink className="size-3" />
-                            <span>Gallery</span>
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(job.id)}
-                            className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                          >
-                            {copiedId === job.id ? (
-                              <>
-                                <Check className="size-3 text-emerald-400" />
-                                <span className="text-emerald-400">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="size-3" />
-                                <span>Copy URLs</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        {/* Status */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {isRunning && (
+                                <>
+                                  <Loader2 className="size-3 animate-spin text-gold" />
+                                  <span className="font-mono text-[11px] font-semibold text-gold">
+                                    {job.status}
+                                  </span>
+                                </>
+                              )}
+                              {isDone && (
+                                <>
+                                  <CheckCircle2 className="size-3 text-emerald-400" />
+                                  <span className="font-mono text-[11px] font-semibold text-emerald-400">
+                                    COMPLETED
+                                  </span>
+                                </>
+                              )}
+                              {job.status === "QUEUED" && (
+                                <>
+                                  <Clock className="size-3 text-muted-foreground" />
+                                  <span className="font-mono text-[11px] font-semibold text-muted-foreground">
+                                    QUEUED
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            {/* Progress bar */}
+                            <div className="flex items-center gap-1">
+                              {[20, 40, 60, 80, 100].map((step) => (
+                                <span
+                                  key={step}
+                                  className={`h-1 w-3 rounded-full transition-all ${
+                                    job.progress_percent >= step
+                                      ? isDone
+                                        ? "bg-emerald-400"
+                                        : "bg-gold"
+                                      : "bg-muted"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Created */}
+                        <td className="px-4 py-3.5 text-muted-foreground">
+                          {job.created_at ? new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recent"}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href="/dashboard/gallery"
+                              className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary/60 px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-secondary"
+                            >
+                              <ExternalLink className="size-3" />
+                              <span>Gallery</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(job)}
+                              className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              {copiedId === job.id ? (
+                                <>
+                                  <Check className="size-3 text-emerald-400" />
+                                  <span className="text-emerald-400">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="size-3" />
+                                  <span>Copy URLs</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

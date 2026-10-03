@@ -26,6 +26,9 @@ logging.basicConfig(
 logger = logging.getLogger("omnistage.main")
 
 
+from sqlalchemy import text
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -34,6 +37,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     logger.info("Initializing OmniStage AI database tables...")
     Base.metadata.create_all(bind=engine)
+
+    # Ensure schema integrity for SQLite local deployments
+    try:
+        with engine.connect() as conn:
+            res = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+            col_names = [row[1] for row in res]
+            if "firebase_uid" not in col_names:
+                logger.info("Auto-migrating SQLite users table: adding firebase_uid...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN firebase_uid VARCHAR(128)"))
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_firebase_uid ON users (firebase_uid)"))
+                conn.commit()
+    except Exception as exc:
+        logger.warning(f"Database schema check notice: {exc}")
+
     logger.info("Database initialized successfully.")
     yield
     logger.info("Shutting down OmniStage AI backend service...")

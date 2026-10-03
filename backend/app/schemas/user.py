@@ -19,8 +19,13 @@ class UserLogin(BaseModel):
     password: str
 
 
+class FirebaseAuthRequest(BaseModel):
+    id_token: str
+
+
 class UserResponse(UserBase):
     id: str
+    firebase_uid: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

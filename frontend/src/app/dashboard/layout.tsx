@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sparkles,
   LayoutDashboard,
@@ -12,13 +12,19 @@ import {
   Images,
   Zap,
   ChevronsUpDown,
-  Settings,
   Menu,
   X,
   ChevronRight,
   Plus,
   Bell,
+  LogOut,
+  User as UserIcon,
+  Check,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
+
+const emptySubscribe = () => () => {};
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -26,17 +32,24 @@ const NAV_ITEMS = [
   { href: "/dashboard/brand-dna", label: "Brand DNA Engine", icon: Dna },
   { href: "/dashboard/products", label: "Products Library", icon: Boxes },
   { href: "/dashboard/gallery", label: "Asset Gallery", icon: Images },
-  { href: "/dashboard/pipeline", label: "Media Pipeline Jobs", icon: Zap, badge: "3" },
+  { href: "/dashboard/pipeline", label: "Media Pipeline Jobs", icon: Zap },
 ];
 
 const BREADCRUMB_TITLES: Record<string, string> = {
   "/dashboard": "Overview",
-  "/dashboard/create": "New Generation",
+  "/dashboard/create": "Create Studio",
   "/dashboard/brand-dna": "Brand DNA Engine",
   "/dashboard/products": "Products Library",
   "/dashboard/gallery": "Asset Gallery",
   "/dashboard/pipeline": "Media Pipeline Jobs",
 };
+
+interface NotificationItem {
+  id: string;
+  title: string;
+  time: string;
+  read: boolean;
+}
 
 export default function DashboardLayout({
   children,
@@ -44,7 +57,105 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [activeBrandName, setActiveBrandName] = useState(() =>
+    typeof window !== "undefined"
+      ? localStorage.getItem("omnistage_active_brand") || "LUXORA"
+      : "LUXORA"
+  );
+  const [activeJobCount, setActiveJobCount] = useState<number>(0);
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: "1",
+      title: "Cloudinary CDN connection verified and active",
+      time: "Just now",
+      read: false,
+    },
+    {
+      id: "2",
+      title: "OmniStage AI vision analysis engine ready",
+      time: "2m ago",
+      read: false,
+    },
+    {
+      id: "3",
+      title: "Brand DNA Engine synchronized with workspace",
+      time: "15m ago",
+      read: true,
+    },
+  ]);
+
+  const { user, loading, logout } = useAuth();
+
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, user, router]);
+
+  // Fetch real active job count
+  useEffect(() => {
+    if (!user) return;
+    api.getGenerationJobs()
+      .then((jobs) => {
+        const active = jobs.filter((j) => j.status !== "COMPLETED" && j.status !== "FAILED").length;
+        setActiveJobCount(active);
+      })
+      .catch(() => {
+        // quiet error
+      });
+  }, [user, pathname]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
+
+  const selectBrand = (brandName: string) => {
+    setActiveBrandName(brandName);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("omnistage_active_brand", brandName);
+    }
+    setShowWorkspaceMenu(false);
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const userName =
+    mounted && user?.full_name
+      ? user.full_name
+      : mounted && user?.email
+      ? user.email.split("@")[0]
+      : "User";
+
+  const userEmail = mounted && user?.email ? user.email : "";
+
+  const userInitials =
+    mounted && user?.full_name
+      ? user.full_name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+      : mounted && user?.email
+      ? user.email.slice(0, 2).toUpperCase()
+      : "U";
 
   const currentPageTitle = BREADCRUMB_TITLES[pathname] || "Overview";
 
@@ -56,6 +167,10 @@ export default function DashboardLayout({
           item.href === "/dashboard"
             ? pathname === "/dashboard"
             : pathname.startsWith(item.href);
+
+        const badge = item.href === "/dashboard/pipeline" && activeJobCount > 0
+          ? String(activeJobCount)
+          : undefined;
 
         return (
           <li key={item.href}>
@@ -79,9 +194,9 @@ export default function DashboardLayout({
                 className={`size-4 ${isActive ? "text-gold" : "text-muted-foreground group-hover:text-foreground"}`}
               />
               <span className="flex-1">{item.label}</span>
-              {item.badge && (
+              {badge && (
                 <span className="rounded-md bg-cyan/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-cyan">
-                  {item.badge}
+                  {badge}
                 </span>
               )}
             </Link>
@@ -109,24 +224,52 @@ export default function DashboardLayout({
       <div className="relative px-3 pt-4">
         <button
           type="button"
-          aria-expanded="false"
+          onClick={() => setShowWorkspaceMenu((prev) => !prev)}
+          aria-expanded={showWorkspaceMenu}
           aria-haspopup="listbox"
           className="flex w-full items-center gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent p-2.5 text-left transition-colors hover:border-white/15"
         >
           <span
             className="flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-background"
-            style={{ backgroundColor: "#C9A227" }}
+            style={{ backgroundColor: activeBrandName === "VANTA" ? "#00F2FE" : activeBrandName === "TERRA" ? "#C9A877" : "#C9A227" }}
           >
-            L
+            {activeBrandName[0]}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-sm font-semibold">LUXORA</span>
+            <span className="block truncate text-sm font-semibold">{activeBrandName}</span>
             <span className="block truncate text-xs text-muted-foreground">
-              Minimalist Luxury
+              {activeBrandName === "VANTA" ? "Urban Streetwear" : activeBrandName === "TERRA" ? "Earthy Natural" : "Minimalist Luxury"}
             </span>
           </span>
           <ChevronsUpDown className="size-4 text-muted-foreground" />
         </button>
+
+        {/* Dropdown Menu for Workspace */}
+        {showWorkspaceMenu && (
+          <div className="absolute left-3 right-3 top-full z-40 mt-1 rounded-xl border border-sidebar-border bg-card p-1.5 shadow-xl">
+            {[
+              { name: "LUXORA", desc: "Minimalist Luxury", color: "#C9A227" },
+              { name: "VANTA", desc: "Urban Streetwear", color: "#00F2FE" },
+              { name: "TERRA", desc: "Earthy Natural", color: "#C9A877" },
+            ].map((b) => (
+              <button
+                key={b.name}
+                type="button"
+                onClick={() => selectBrand(b.name)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary ${
+                  activeBrandName === b.name ? "bg-secondary/70 text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <span
+                  className="size-3.5 rounded-full"
+                  style={{ backgroundColor: b.color }}
+                />
+                <span className="font-semibold text-foreground flex-1">{b.name}</span>
+                {activeBrandName === b.name && <Check className="size-3 text-gold" />}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Nav List */}
@@ -167,22 +310,24 @@ export default function DashboardLayout({
         </div>
 
         {/* User Card */}
-        <div className="flex items-center gap-3 rounded-xl p-2">
-          <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-[#1d2a4a] to-[#3b4a63] text-xs font-semibold">
-            AM
+        <div className="flex items-center gap-3 rounded-xl p-2 bg-white/[0.03] border border-white/5">
+          <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-[#1d2a4a] to-[#3b4a63] text-xs font-semibold text-white">
+            {userInitials}
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-sm font-medium">Ava Moreau</span>
+            <span className="block truncate text-sm font-medium text-white">{userName}</span>
             <span className="block truncate text-xs text-muted-foreground">
-              ava@luxora.co
+              {userEmail}
             </span>
           </span>
           <button
             type="button"
-            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
-            aria-label="Settings"
+            onClick={handleLogout}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors"
+            title="Log out"
+            aria-label="Log out"
           >
-            <Settings className="size-4" />
+            <LogOut className="size-4" />
           </button>
         </div>
       </div>
@@ -246,7 +391,7 @@ export default function DashboardLayout({
               <li className="hidden sm:block" aria-hidden="true">
                 <ChevronRight className="size-3.5 text-muted-foreground/60" />
               </li>
-              <li className="hidden text-muted-foreground sm:block">LUXORA</li>
+              <li className="hidden text-muted-foreground sm:block">{activeBrandName}</li>
               <li className="hidden sm:block" aria-hidden="true">
                 <ChevronRight className="size-3.5 text-muted-foreground/60" />
               </li>
@@ -275,24 +420,98 @@ export default function DashboardLayout({
             <span className="sr-only sm:hidden">New Product Generation</span>
           </Link>
 
-          {/* Notification Bell */}
-          <button
-            type="button"
-            className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
-            aria-label="Notifications, 2 unread"
-          >
-            <Bell className="size-4" />
-            <span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background bg-gold" />
-          </button>
+          {/* Notification Bell with Panel */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNotifications((prev) => !prev);
+                setShowProfileMenu(false);
+              }}
+              className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              aria-label={`Notifications, ${unreadCount} unread`}
+            >
+              <Bell className="size-4" />
+              {unreadCount > 0 && (
+                <span className="absolute right-2 top-2 size-2 rounded-full border-2 border-background bg-gold" />
+              )}
+            </button>
 
-          {/* User Account Avatar */}
-          <button
-            type="button"
-            className="hidden size-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1d2a4a] to-[#3b4a63] text-xs font-semibold sm:flex"
-            aria-label="Account menu"
-          >
-            AM
-          </button>
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-card p-3 shadow-2xl z-50">
+                <div className="flex items-center justify-between border-b border-border pb-2">
+                  <span className="text-xs font-semibold text-foreground">Notifications</span>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={markAllNotificationsRead}
+                      className="text-[11px] text-gold hover:underline"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 space-y-2">
+                  {notifications.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`rounded-lg p-2 text-xs transition-colors ${
+                        item.read ? "bg-muted/20 text-muted-foreground" : "bg-gold/10 text-foreground font-medium"
+                      }`}
+                    >
+                      <p>{item.title}</p>
+                      <span className="text-[10px] text-muted-foreground">{item.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* User Account Avatar with Profile Menu */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowProfileMenu((prev) => !prev);
+                setShowNotifications(false);
+              }}
+              className="hidden size-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1d2a4a] to-[#3b4a63] text-xs font-semibold sm:flex text-white hover:ring-2 hover:ring-gold/50 transition-all"
+              title={`Signed in as ${userEmail}`}
+              aria-label="Account menu"
+            >
+              {userInitials}
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-border bg-card p-3 shadow-2xl z-50">
+                <div className="flex items-center gap-2.5 border-b border-border pb-3">
+                  <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1d2a4a] to-[#3b4a63] text-xs font-semibold text-white">
+                    {userInitials}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold text-foreground">{userName}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">{userEmail}</p>
+                  </div>
+                </div>
+
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground">
+                    <UserIcon className="size-3.5 text-gold" />
+                    <span>Workspace: {activeBrandName}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut className="size-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Page Content */}

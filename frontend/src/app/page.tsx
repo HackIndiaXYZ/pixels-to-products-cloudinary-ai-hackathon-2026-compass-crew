@@ -3,6 +3,36 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
+
+const HeroProductScene = dynamic(
+  () => import("@/components/3d/HeroProductScene"),
+  { ssr: false }
+);
+const BrandDNAScene = dynamic(
+  () => import("@/components/3d/BrandDNAScene"),
+  { ssr: false }
+);
+const ColorwayScene = dynamic(
+  () => import("@/components/3d/ColorwayScene"),
+  { ssr: false }
+);
+const PipelineScene = dynamic(
+  () => import("@/components/3d/PipelineScene"),
+  { ssr: false }
+);
+const PreservationScene = dynamic(
+  () => import("@/components/3d/PreservationScene"),
+  { ssr: false }
+);
+const SceneEngineScene = dynamic(
+  () => import("@/components/3d/SceneEngineScene"),
+  { ssr: false }
+);
+const WorkflowScene = dynamic(
+  () => import("@/components/3d/WorkflowScene"),
+  { ssr: false }
+);
 import {
   Sparkles,
   ArrowRight,
@@ -178,13 +208,13 @@ export default function LandingPage() {
           {/* CTAs */}
           <div className="hidden items-center gap-2 lg:flex">
             <Link
-              href="/dashboard"
+              href="/login"
               className="inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-white/5"
             >
               Sign In
             </Link>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground glow-gold hover:bg-[#d9b43c] transition-all"
             >
               Start Free Trial
@@ -255,16 +285,16 @@ export default function LandingPage() {
             </ul>
             <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-3">
               <Link
-                href="/dashboard"
+                href="/login"
                 className="flex h-11 items-center justify-center rounded-xl border border-border text-sm font-medium text-foreground hover:bg-white/5"
               >
                 Sign In
               </Link>
               <Link
-                href="/dashboard"
+                href="/signup"
                 className="flex h-11 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground glow-gold hover:bg-[#d9b43c]"
               >
-                Launch App
+                Start Free Trial
               </Link>
             </div>
           </div>
@@ -341,6 +371,11 @@ export default function LandingPage() {
             <p className="mt-4 text-xs text-muted-foreground">
               10 free credits · No credit card required
             </p>
+
+            {/* 3D Interactive Hero Product Visual with Orbiting Aspect Ratios */}
+            <div className="mt-6 w-full max-w-xl">
+              <HeroProductScene className="h-[250px] sm:h-[290px] w-full" />
+            </div>
           </div>
 
           {/* ── 3. Product Transformation Showcase Section ── */}
@@ -469,6 +504,7 @@ export default function LandingPage() {
                         src={activeColor.img}
                         alt="16:9 Web Banner"
                         fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
                         className="object-cover transition-transform duration-700 animate-in fade-in group-hover:scale-105"
                       />
                       <span className="absolute left-2 top-2 rounded-md bg-background/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground backdrop-blur">
@@ -482,6 +518,7 @@ export default function LandingPage() {
                         src={activeColor.img}
                         alt="9:16 Reels asset"
                         fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         className="object-cover transition-transform duration-700 animate-in fade-in group-hover:scale-105"
                       />
                       <span className="absolute left-2 top-2 rounded-md bg-background/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground backdrop-blur">
@@ -495,6 +532,7 @@ export default function LandingPage() {
                         src={activeColor.img}
                         alt="1:1 Marketplace"
                         fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         className="object-cover transition-transform duration-700 animate-in fade-in group-hover:scale-105"
                       />
                       <span className="absolute left-2 top-2 rounded-md bg-background/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground backdrop-blur">
@@ -508,6 +546,7 @@ export default function LandingPage() {
                         src={activeColor.img}
                         alt="4:5 Social Feed"
                         fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         className="object-cover transition-transform duration-700 animate-in fade-in group-hover:scale-105"
                       />
                       <span className="absolute left-2 top-2 rounded-md bg-background/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground backdrop-blur">
@@ -644,7 +683,12 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <ol className="relative mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* 3D Interactive Pipeline Process Nodes */}
+          <div className="mx-auto mt-8 max-w-4xl">
+            <WorkflowScene className="h-[140px] md:h-[160px] w-full" />
+          </div>
+
+          <ol className="relative mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute left-0 right-0 top-[52px] hidden h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent lg:block"
@@ -761,6 +805,11 @@ export default function LandingPage() {
                 </p>
               </div>
 
+              {/* 3D AI Preservation Shield & Lock Matrix */}
+              <div className="w-full rounded-2xl border border-border bg-[#0a0d14]/50 overflow-hidden">
+                <PreservationScene className="h-[150px] md:h-[170px] w-full" />
+              </div>
+
               {/* Interactive Before/After Split */}
               <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-border bg-[#e9e9ea]">
                 {/* Before Image */}
@@ -768,6 +817,7 @@ export default function LandingPage() {
                   src="/products/sneaker-navy.png"
                   alt="Before: original navy sneaker"
                   fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover"
                 />
 
@@ -780,6 +830,7 @@ export default function LandingPage() {
                     src="/products/sneaker-onyx.png"
                     alt="After: onyx black sneaker in luxury scene"
                     fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-cover"
                   />
                 </div>
@@ -841,11 +892,17 @@ export default function LandingPage() {
                 </p>
               </div>
 
+              {/* 3D Floating Environment Cards */}
+              <div className="w-full rounded-2xl border border-border bg-[#0a0d14]/50 overflow-hidden">
+                <SceneEngineScene className="h-[130px] w-full" activeScene={activeScene} />
+              </div>
+
               <div className="relative flex-1 min-h-48 overflow-hidden rounded-2xl border border-border">
                 <Image
                   src={activeSceneData.img}
                   alt={`${activeScene} scene render`}
                   fill
+                  sizes="(max-width: 1024px) 100vw, 33vw"
                   className="object-cover animate-in fade-in duration-300"
                 />
               </div>
@@ -882,6 +939,11 @@ export default function LandingPage() {
                 </p>
               </div>
 
+              {/* 3D Real-time Colorway Transition */}
+              <div className="w-full rounded-2xl border border-border bg-[#0a0d14]/50 overflow-hidden">
+                <ColorwayScene className="h-[130px] w-full" activeIndex={featureColorIndex} />
+              </div>
+
               <div className="grid grid-cols-4 gap-2">
                 {COLORWAY_PREVIEWS.map((cw, i) => (
                   <button
@@ -900,6 +962,7 @@ export default function LandingPage() {
                       src={cw.img}
                       alt={cw.label}
                       fill
+                      sizes="80px"
                       className="object-cover"
                     />
                   </button>
@@ -930,6 +993,11 @@ export default function LandingPage() {
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                   Every asset is transformed, optimized, and served from a global CDN automatically.
                 </p>
+              </div>
+
+              {/* 3D Real-time Processing Pipeline */}
+              <div className="w-full rounded-2xl border border-border bg-[#0a0d14]/50 overflow-hidden">
+                <PipelineScene className="h-[130px] md:h-[150px] w-full" />
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-border bg-background/80 font-mono text-xs">
@@ -1029,6 +1097,11 @@ export default function LandingPage() {
                 </span>
               </div>
 
+              {/* 3D Brand DNA Core & Orbiting Palette Elements */}
+              <div className="w-full my-3 rounded-2xl border border-border bg-[#0a0d14]/50 overflow-hidden">
+                <BrandDNAScene className="h-[180px] md:h-[210px] w-full" />
+              </div>
+
               {/* Swatches */}
               <div className="mt-5 grid grid-cols-5 gap-2">
                 {[
@@ -1057,6 +1130,7 @@ export default function LandingPage() {
                     src="/products/sneaker-sand.png"
                     alt="Sneaker Sand"
                     fill
+                    sizes="(max-width: 768px) 33vw, 15vw"
                     className="object-cover"
                   />
                 </div>
@@ -1065,6 +1139,7 @@ export default function LandingPage() {
                     src="/products/watch.png"
                     alt="Watch"
                     fill
+                    sizes="(max-width: 768px) 33vw, 15vw"
                     className="object-cover"
                   />
                 </div>
@@ -1073,6 +1148,7 @@ export default function LandingPage() {
                     src="/products/handbag.png"
                     alt="Handbag"
                     fill
+                    sizes="(max-width: 768px) 33vw, 15vw"
                     className="object-cover"
                   />
                 </div>
