@@ -29,11 +29,17 @@ export default function DashboardOverviewPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [activeBrandName, setActiveBrandName] = useState("LUXORA");
 
-  const activeBrandName =
-    typeof window !== "undefined"
-      ? localStorage.getItem("omnistage_active_brand") || "LUXORA"
-      : "LUXORA";
+  // Keep browser-only state out of the server render to prevent hydration mismatches.
+  useEffect(() => {
+    setMounted(true);
+    const savedBrand = localStorage.getItem("omnistage_active_brand");
+    if (savedBrand) {
+      setActiveBrandName(savedBrand);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -98,8 +104,14 @@ export default function DashboardOverviewPage() {
     }
   };
 
+  // Auth state can be restored from browser storage after hydration.
+  // Render a stable server/client fallback until the browser is mounted.
   const userName =
-    user?.full_name || (user?.email ? user.email.split("@")[0] : "Creator");
+    mounted && user?.full_name
+      ? user.full_name
+      : mounted && user?.email
+      ? user.email.split("@")[0]
+      : "Creator";
 
   const completedJobsCount = jobs.filter((j) => j.status === "COMPLETED").length;
   const totalAssetsCount = assets.length;
