@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api, GenerationJob, Asset, Brand } from "@/lib/api";
-
+\nconst emptySubscribe = () => () => {};\n\nconst subscribeToActiveBrand = (callback: () => void) => {\n  window.addEventListener("storage", callback);\n  window.addEventListener("omnistage-brand-change", callback);\n  return () => {\n    window.removeEventListener("storage", callback);\n    window.removeEventListener("omnistage-brand-change", callback);\n  };\n};\n\nconst getActiveBrandClientSnapshot = () =>\n  localStorage.getItem("omnistage_active_brand") || "LUXORA";\n\nconst getActiveBrandServerSnapshot = () => "LUXORA";\n
 export default function DashboardOverviewPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -29,17 +29,16 @@ export default function DashboardOverviewPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [activeBrandName, setActiveBrandName] = useState("LUXORA");
-
-  // Keep browser-only state out of the server render to prevent hydration mismatches.
-  useEffect(() => {
-    setMounted(true);
-    const savedBrand = localStorage.getItem("omnistage_active_brand");
-    if (savedBrand) {
-      setActiveBrandName(savedBrand);
-    }
-  }, []);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  const activeBrandName = useSyncExternalStore(
+    subscribeToActiveBrand,
+    getActiveBrandClientSnapshot,
+    getActiveBrandServerSnapshot
+  );
 
   useEffect(() => {
     if (!user) return;
