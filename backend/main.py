@@ -66,9 +66,15 @@ app = FastAPI(
 )
 
 # Configure CORS Middleware
+# Always allow the deployed OmniStage frontend in addition to configured origins.
+allowed_origins = list(dict.fromkeys([
+    *settings.BACKEND_CORS_ORIGINS,
+    "https://omnistage-ai.netlify.app",
+]))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
