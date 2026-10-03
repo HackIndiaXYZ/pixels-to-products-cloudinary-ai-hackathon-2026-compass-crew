@@ -61,7 +61,7 @@ def list_job_assets(
     """
     Returns the complete list of assets produced by a generation job run.
     """
-    assets = get_job_assets(db=db, job_id=job_id)
+    assets = get_job_assets(db=db, job_id=job_id, user_id=str(current_user.id))
     return [AssetResponse.model_validate(a) for a in assets]
 
 
@@ -106,5 +106,5 @@ def remove_asset(
     """
     Deletes an asset record and cleans up stored files on Cloudinary.
     """
-    delete_asset(db=db, asset_id=asset_id)
+    delete_asset(db=db, asset_id=asset_id, user_id=str(current_user.id))
     return {"success": True, "message": f"Asset {asset_id} deleted successfully."}

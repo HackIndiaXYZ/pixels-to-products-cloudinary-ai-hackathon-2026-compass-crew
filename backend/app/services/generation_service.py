@@ -43,11 +43,14 @@ def create_generation_job(
     return job
 
 
-def get_job_status(db: Session, job_id: str) -> GenerationJob:
+def get_job_status(db: Session, job_id: str, user_id: Optional[str] = None) -> GenerationJob:
     """
-    Fetches the current progress and status of a generation job.
+    Fetches the current progress and status of a generation job with user isolation.
     """
-    job = db.query(GenerationJob).filter(GenerationJob.id == job_id).first()
+    query = db.query(GenerationJob).filter(GenerationJob.id == job_id)
+    if user_id:
+        query = query.join(Product).filter(Product.user_id == user_id)
+    job = query.first()
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

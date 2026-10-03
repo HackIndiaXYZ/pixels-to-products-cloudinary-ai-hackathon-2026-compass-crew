@@ -97,5 +97,5 @@ def check_job_status(
     """
     Polls the current status, step message, and percentage completion of a generation job.
     """
-    job = get_job_status(db=db, job_id=job_id)
+    job = get_job_status(db=db, job_id=job_id, user_id=str(current_user.id))
     return _format_job_response(job)
