@@ -26,6 +26,20 @@ import { api } from "@/lib/api";
 
 const emptySubscribe = () => () => {};
 
+const subscribeToActiveBrand = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  window.addEventListener("omnistage-brand-change", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("omnistage-brand-change", callback);
+  };
+};
+
+const getActiveBrandClientSnapshot = () =>
+  localStorage.getItem("omnistage_active_brand") || "LUXORA";
+
+const getActiveBrandServerSnapshot = () => "LUXORA";
+
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/create", label: "Create Studio", icon: WandSparkles },
@@ -62,10 +76,10 @@ export default function DashboardLayout({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
-  const [activeBrandName, setActiveBrandName] = useState(() =>
-    typeof window !== "undefined"
-      ? localStorage.getItem("omnistage_active_brand") || "LUXORA"
-      : "LUXORA"
+  const activeBrandName = useSyncExternalStore(
+    subscribeToActiveBrand,
+    getActiveBrandClientSnapshot,
+    getActiveBrandServerSnapshot
   );
   const [activeJobCount, setActiveJobCount] = useState<number>(0);
 
@@ -123,10 +137,8 @@ export default function DashboardLayout({
   };
 
   const selectBrand = (brandName: string) => {
-    setActiveBrandName(brandName);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("omnistage_active_brand", brandName);
-    }
+    localStorage.setItem("omnistage_active_brand", brandName);
+    window.dispatchEvent(new Event("omnistage-brand-change"));
     setShowWorkspaceMenu(false);
   };
 
