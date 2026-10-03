@@ -18,7 +18,23 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api, GenerationJob, Asset, Brand } from "@/lib/api";
-\nconst emptySubscribe = () => () => {};\n\nconst subscribeToActiveBrand = (callback: () => void) => {\n  window.addEventListener("storage", callback);\n  window.addEventListener("omnistage-brand-change", callback);\n  return () => {\n    window.removeEventListener("storage", callback);\n    window.removeEventListener("omnistage-brand-change", callback);\n  };\n};\n\nconst getActiveBrandClientSnapshot = () =>\n  localStorage.getItem("omnistage_active_brand") || "LUXORA";\n\nconst getActiveBrandServerSnapshot = () => "LUXORA";\n
+const emptySubscribe = () => () => {};
+
+const subscribeToActiveBrand = (callback: () => void) => {
+  window.addEventListener("storage", callback);
+  window.addEventListener("omnistage-brand-change", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("omnistage-brand-change", callback);
+  };
+};
+
+const getActiveBrandClientSnapshot = () =>
+  localStorage.getItem("omnistage_active_brand") || "LUXORA";
+
+const getActiveBrandServerSnapshot = () => "LUXORA";
+
+
 export default function DashboardOverviewPage() {
   const router = useRouter();
   const { user } = useAuth();
