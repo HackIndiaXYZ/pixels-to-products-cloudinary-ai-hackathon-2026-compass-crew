@@ -2,237 +2,371 @@
 
 > **One Product Photo. Every Color. Every Format. Every Channel.**
 
-OmniStage AI is an AI-powered e-commerce product media generation platform that turns a single product image into a consistent, multi-channel content set.
+**OmniStage AI** is an AI-powered e-commerce product media generation platform that turns one source product image into a consistent, brand-aware set of product assets.
 
-Instead of manually recreating product visuals for every color variant, platform ratio, and campaign style, OmniStage analyzes the product, applies reusable **Brand DNA**, generates high-fidelity variants, and delivers optimized assets through **Cloudinary**.
+Built for **Pixels to Products — Cloudinary AI Hackathon 2026** under **PS-03 — Your Media-Savvy Startup**.
+
+🌐 **Live Demo:** https://omnistage-ai.netlify.app/
+
+💻 **Backend API:** https://pixels-to-products-cloudinary-ai-wja3.onrender.com/
+
+📦 **Repository:** https://github.com/HackIndiaXYZ/pixels-to-products-cloudinary-ai-hackathon-2026-compass-crew
 
 ---
 
-## ✨ What OmniStage AI Does
+## 🎯 The Problem
 
-### 🎨 Instant Colorway Generation
-Generate new product color variants while preserving the product's visual identity, including:
-- Shape and geometry
-- Logos and branding
-- Stitching and fine details
-- Materials and textures
-- Product-specific characteristics
+E-commerce teams often start with a small number of product photos but need many variations for marketplaces, websites, social media, campaigns, and product catalogs.
 
-### 📐 Multi-Channel Format Generation
-Create channel-ready assets across four target formats:
+Creating those variations manually means repeatedly:
 
-| Format | Typical Use |
-|---|---|
-| **1:1** | Marketplace / square product cards |
-| **4:5** | Social feeds / portrait commerce |
-| **9:16** | Stories / Reels / Shorts |
-| **16:9** | Web banners / landscape placements |
+- Recoloring products
+- Resizing for different channels
+- Rebuilding scenes
+- Applying brand guidelines
+- Uploading and organizing final media
+- Checking that product details were not unintentionally changed
 
-The AI engine supports the four formats at the application level. For image-generation providers with native-ratio constraints, the implementation maps unsupported ratios such as **4:5** to the closest supported generation ratio and preserves the requested application format in metadata.
+Generic image-generation workflows can also drift from the original product's shape, materials, branding, or other defining details.
+
+---
+
+## 💡 The Solution
+
+OmniStage AI turns that fragmented workflow into one reusable product-media pipeline:
+
+```text
+One Product Image
+       ↓
+AI Product Understanding
+       ↓
+Brand DNA
+       ↓
+Detail Preservation
+       ↓
+Colorway / Scene Generation
+       ↓
+Multi-Format Generation
+       ↓
+Cloudinary Media Pipeline
+       ↓
+Asset Gallery
+```
+
+The result is a production-oriented workflow where the seller starts with a single source image and ends with a managed set of ready-to-use assets.
+
+---
+
+## ✨ Core Features
+
+### 🧠 AI Product Understanding
+
+Analyzes the source product and extracts useful context such as:
+
+- Product category
+- Base color
+- Material
+- Visible components
+- Important visual characteristics
+- Suggested lighting / environments
+- Detail locks
+
+This context is reused during generation instead of treating every request as a generic image prompt.
 
 ### 🧬 Brand DNA Engine
-Save a brand's visual rules once and reuse them across generations:
-- Color palette
-- Aesthetic / visual style
-- Lighting direction
-- Background mood
+
+Store and reuse visual brand rules such as:
+
+- Primary and secondary colors
+- Aesthetic
+- Lighting
+- Background style
 - Scene preferences
 - Product-preservation instructions
 
+### 🎨 Instant Colorway Generation
+
+Create product color variants while keeping the underlying product identity consistent.
+
+The generation workflow is designed to protect:
+
+- Product shape and geometry
+- Logos and branding
+- Stitching and fine details
+- Materials and textures
+- Other defining product characteristics
+
 ### 🎬 Scene Generation
-Stage the same authentic product in commercial environments such as:
+
+Create commercial product presentations using scene directions such as:
+
 - Premium Studio
 - Minimal
 - Lifestyle
 - Urban
 - Luxury
 
+### 📐 Multi-Channel Formats
+
+OmniStage supports four target application formats:
+
+| Format | Example Use |
+|---|---|
+| **1:1** | Marketplace / square product cards |
+| **4:5** | Social feeds / portrait commerce |
+| **9:16** | Stories / Reels / Shorts |
+| **16:9** | Web banners / landscape placements |
+
+Where a generation provider has native aspect-ratio constraints, the application maps the requested format to a compatible generation ratio and preserves the requested output format in the workflow metadata.
+
 ### 🛡️ Detail Preservation
-OmniStage's prompting layer explicitly protects important product attributes so generated assets remain commercially faithful to the source.
+
+Generation prompts explicitly preserve important product attributes so creative variation does not unnecessarily change the source product identity.
 
 ### ☁️ Cloudinary Media Pipeline
-Cloudinary is used as the media layer for:
-- Product image uploads
-- Asset storage and delivery
-- Transformations
-- Optimization
-- CDN URLs
 
-The backend exposes Cloudinary upload-signature, upload, transformation, and optimization workflows.
+Cloudinary is a core media layer in OmniStage AI.
+
+We use it for:
+
+- Source product image uploads
+- Generated asset storage
+- Media transformations
+- Automatic optimization
+- CDN delivery
+- Production-ready asset URLs
+
+The final assets can be consumed directly from Cloudinary CDN URLs.
 
 ### 🖼️ Asset Gallery
+
 Generated assets can be:
+
 - Previewed
-- Filtered by aspect ratio
+- Filtered by format
+- Filtered by color
 - Downloaded
 - Copied as CDN URLs
-- Reused from the generation history
+- Viewed by generation job
+
+### ⚙️ Generation Pipeline
+
+Generation jobs move through trackable processing states such as:
+
+```text
+QUEUED
+  ↓
+ANALYZING
+  ↓
+GENERATING
+  ↓
+TRANSFORMING
+  ↓
+OPTIMIZING
+  ↓
+COMPLETED
+```
 
 ---
 
 ## 🏗️ Architecture
 
 ```text
-┌───────────────────────┐
-│      Seller / User    │
-└───────────┬───────────┘
-            │
-            ▼
-┌───────────────────────┐
-│   Next.js Frontend    │
-│ React + TypeScript    │
-└───────────┬───────────┘
-            │ REST API
-            ▼
-┌───────────────────────┐
-│      FastAPI API      │
-│ Auth • Products       │
-│ Brands • Generation   │
-│ Assets • Cloudinary   │
-└───────┬───────┬───────┘
-        │       │
-        │       ▼
-        │  ┌────────────────────┐
-        │  │  SQLite / SQLAlchemy│
-        │  │ users • brands      │
-        │  │ products • jobs     │
-        │  │ assets              │
-        │  └────────────────────┘
-        │
-        ▼
-┌───────────────────────┐
-│       AI Engine       │
-│ Vision Analysis       │
-│ Brand Prompt Builder  │
-│ Colorway Generation   │
-│ Scene Generation      │
-│ Fidelity Validation   │
-└───────────┬───────────┘
-            │
-            ▼
-┌───────────────────────┐
-│      Cloudinary       │
-│ Upload • Transform    │
-│ Optimize • CDN        │
-└───────────┬───────────┘
-            │
-            ▼
-┌───────────────────────┐
-│    Asset Gallery      │
-└───────────────────────┘
+┌───────────────────────────────┐
+│           Seller              │
+└──────────────┬────────────────┘
+               │
+               ▼
+┌───────────────────────────────┐
+│       Next.js Frontend        │
+│   React • TypeScript • UI     │
+│      Netlify Deployment       │
+└──────────────┬────────────────┘
+               │ HTTPS REST API
+               ▼
+┌───────────────────────────────┐
+│          FastAPI API          │
+│ Auth • Products • Brands      │
+│ Generation • Assets           │
+│ Cloudinary integration        │
+│      Render Deployment        │
+└───────┬───────────┬───────────┘
+        │           │
+        │           ├─────────────────┐
+        ▼           ▼                 ▼
+┌──────────────┐ ┌──────────────┐ ┌────────────────┐
+│   Firebase   │ │  AI Engine   │ │  SQLAlchemy    │
+│ Authentication│ │ Gemini/GenAI │ │ SQLite         │
+└──────────────┘ └──────┬───────┘ └────────────────┘
+                        │
+                        ▼
+               ┌────────────────┐
+               │   Cloudinary   │
+               │ Upload         │
+               │ Transform      │
+               │ Optimize       │
+               │ CDN Delivery   │
+               └───────┬────────┘
+                       │
+                       ▼
+               ┌────────────────┐
+               │ Asset Gallery  │
+               └────────────────┘
 ```
 
 ---
 
-## 🧠 AI Workflow
+## 🧠 End-to-End AI Workflow
 
 ```text
-Upload Product
-      ↓
-AI Product Analysis
-      ↓
-Extract category / color / material / components
-      ↓
-Apply Brand DNA
-      ↓
-Apply Preservation Locks
-      ↓
-Generate Colorways / Scenes
-      ↓
-Generate Target Formats
-      ↓
-Store & Transform with Cloudinary
-      ↓
-Track Job Status
-      ↓
-Deliver Assets in Gallery
+1. Upload Product
+        ↓
+2. Product Record Created
+        ↓
+3. AI Product Analysis
+        ↓
+4. Apply Brand DNA
+        ↓
+5. Apply Detail Preservation Locks
+        ↓
+6. Select Colorways / Scenes
+        ↓
+7. Select Target Formats
+        ↓
+8. Create Generation Job
+        ↓
+9. AI Generation
+        ↓
+10. Cloudinary Storage / Transformation
+        ↓
+11. Track Job Completion
+        ↓
+12. Explore Assets in Gallery
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## 🧪 Verified Example
+
+One tested workflow produces:
+
+```text
+2 Colorways × 4 Formats = 8 Assets
+```
+
+Target formats:
+
+```text
+1:1
+4:5
+9:16
+16:9
+```
+
+The workflow is designed to take one source product image through analysis, brand-aware generation, media processing, and final Cloudinary delivery.
+
+---
+
+## 🛠️ Technology Stack
 
 ### Frontend
-- Next.js **16**
-- React **19**
+
+- Next.js 16
+- React 19
 - TypeScript
 - Tailwind CSS
 - Firebase Authentication
-- Three.js / React Three Fiber for product-focused 3D visuals
+- React Three Fiber / Three.js for product-focused 3D visuals
 - Lucide icons
+- Netlify
 
 ### Backend
-- Python
+
+- Python 3.12+
 - FastAPI
 - SQLAlchemy
 - Pydantic
-- JWT-based application sessions
+- JWT application sessions
 - Firebase Admin SDK
+- Render
 
 ### AI
+
 - Google GenAI / Gemini integration
 - Multimodal product image analysis
-- Generative image workflow
-- Prompt-engineered product fidelity controls
-- Mock provider fallback for development resilience
+- Generative image workflows
+- Product-fidelity prompt controls
+- Development fallback provider for transient AI availability issues
 
 ### Media
+
 - Cloudinary
-- Upload APIs
-- Signed upload parameters
-- Asset transformations
-- Automatic format/quality optimization
+- Upload API
+- Asset storage
+- Transformations
+- Automatic format / quality optimization
 - CDN delivery
 
 ### Database
-- SQLite for the local/hackathon-ready setup
+
+- SQLite for the current hackathon deployment
 - SQLAlchemy ORM
-- PostgreSQL/Supabase-compatible configuration is retained in environment templates for future deployment
 
 ---
 
 ## 🔐 Authentication & Security
 
-OmniStage supports:
+OmniStage AI supports:
+
 - Email/password authentication
 - Google authentication through Firebase
 - Firebase ID-token verification on the backend
 - Application JWT sessions
-- Authenticated access to user products, brands, generation jobs, and assets
+- User-scoped product, brand, generation-job, and asset access
+
+Backend ownership checks are applied to protected resources so one user cannot access another user's product, brand, job, or asset records.
 
 ### Secrets
 
-Actual credentials are intentionally **not committed** to this repository.
+Actual credentials are **not committed** to this repository.
 
-Use local environment files for:
-- Firebase configuration
-- Cloudinary API credentials
-- Gemini API keys
-- JWT secret
-- Database connection settings
-
-The repository contains only example templates such as:
+Environment files include only templates:
 
 ```text
 .env.example
 backend/.env.example
+frontend/.env.example
 ```
 
-Never commit real API keys, Cloudinary secrets, Firebase service-account credentials, or production database passwords.
+Never commit:
+
+```text
+GEMINI_API_KEY
+CLOUDINARY_API_SECRET
+JWT / SECRET_KEY
+Firebase Admin service-account credentials
+Production database passwords
+```
 
 ---
 
 ## 📁 Project Structure
 
 ```text
-omnistage-ai/
+pixels-to-products-cloudinary-ai-hackathon-2026-compass-crew/
+│
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
 │   │   ├── components/
 │   │   ├── context/
-│   │   └── hooks/
-│   └── package.json
+│   │   ├── hooks/
+│   │   └── lib/
+│   │       ├── api.ts
+│   │       └── firebase.ts
+│   ├── netlify.toml
+│   ├── package.json
+│   └── package-lock.json
 │
 ├── backend/
 │   ├── app/
@@ -266,130 +400,81 @@ omnistage-ai/
 
 ## 🚀 Local Setup
 
-### 1. Clone the repository
+### Clone
 
 ```bash
 git clone https://github.com/HackIndiaXYZ/pixels-to-products-cloudinary-ai-hackathon-2026-compass-crew.git
 cd pixels-to-products-cloudinary-ai-hackathon-2026-compass-crew
 ```
 
-### 2. Backend setup
+### Backend
 
-Python **3.12+** is recommended.
+Python **3.12+** recommended.
 
-```bash
-cd backend
-
-python -m venv .venv
-```
-
-Activate the environment:
-
-**Windows PowerShell**
 ```powershell
+cd backend
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-**macOS / Linux**
-```bash
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
 pip install -r requirements.txt
+python -m uvicorn main:app --reload --port 8000
 ```
 
-Create your environment file:
+Backend:
 
 ```text
-backend/.env
-```
-
-Start the API:
-
-```bash
-python -m uvicorn backend.app.main:app --reload --port 8000
-```
-
-Backend endpoints:
-
-```text
-http://localhost:8000/
+http://localhost:8000
 http://localhost:8000/api/health
 http://localhost:8000/docs
 ```
 
-### 3. Frontend setup
+### Frontend
 
 Open a second terminal:
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Open:
+Frontend:
 
 ```text
 http://localhost:3000
 ```
 
----
+### Environment
 
-## 🔑 Environment Configuration
+Copy the appropriate example files and add your own local credentials.
 
-Use the example files as the starting point for local configuration.
-
-### Backend
-
-Required integrations can include:
-
-```env
-ENVIRONMENT=development
-DEBUG=True
-PORT=8000
-
-DATABASE_URL=sqlite:///./omnistage.db
-
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-CLOUDINARY_UPLOAD_PRESET=omnistage_products
-
-GEMINI_API_KEY=your_gemini_api_key
-
-SECRET_KEY=your_secure_secret
-```
-
-### Frontend
-
-For Firebase, configure the public Firebase web-app variables in:
+Frontend:
 
 ```text
 frontend/.env.local
 ```
 
-Never place Firebase Admin service-account credentials in frontend environment variables.
+Backend:
+
+```text
+backend/.env
+```
+
+Do not copy production secrets into the repository.
 
 ---
 
 ## 🔌 Core API Areas
 
-The FastAPI backend currently exposes API groups for:
-
 | Area | Purpose |
 |---|---|
-| `/auth` | Signup, login, Firebase authentication |
-| `/products` | Product creation, listing, retrieval, AI analysis |
-| `/brands` | Brand DNA CRUD |
-| `/cloudinary` | Upload, signatures, transformations, optimization |
-| `/generation` | Generation jobs and status tracking |
-| `/assets` | Generated asset retrieval and job-linked assets |
+| `/api/auth` | Signup, login and Firebase token exchange |
+| `/api/products` | Product creation, listing, retrieval and AI analysis |
+| `/api/brands` | Brand DNA CRUD |
+| `/api/cloudinary` | Product upload and Cloudinary operations |
+| `/api/generations` | Generation job creation and status |
+| `/api/assets` | Generated asset retrieval and deletion |
 
-Interactive API documentation is available at:
+Interactive API documentation:
 
 ```text
 http://localhost:8000/docs
@@ -397,11 +482,51 @@ http://localhost:8000/docs
 
 ---
 
-## 🧪 Testing & Verification
+## 🌐 Deployment
 
-The project includes backend tests under `tests/`.
+### Frontend — Netlify
 
-Useful checks:
+Production frontend:
+
+```text
+https://omnistage-ai.netlify.app/
+```
+
+The frontend is deployed from the `frontend/` directory using Next.js.
+
+### Backend — Render
+
+Production backend:
+
+```text
+https://pixels-to-products-cloudinary-ai-wja3.onrender.com/
+```
+
+Health endpoint:
+
+```text
+https://pixels-to-products-cloudinary-ai-wja3.onrender.com/api/health
+```
+
+### Production flow
+
+```text
+Netlify
+  ↓
+Next.js Frontend
+  ↓
+Render
+  ↓
+FastAPI Backend
+  ├── Firebase
+  ├── Gemini / GenAI
+  ├── SQLite
+  └── Cloudinary
+```
+
+---
+
+## 🧪 Testing & Quality
 
 ### Frontend
 
@@ -417,31 +542,30 @@ npm run build
 pytest
 ```
 
-### Manual end-to-end flow
+### Manual E2E
 
-1. Sign in with Firebase
-2. Upload a product image
-3. Create/open the product
-4. Run AI product analysis
-5. Select or create Brand DNA
-6. Choose colorways
-7. Choose target formats
-8. Generate assets
-9. Track the job in Pipeline
-10. Open the Asset Gallery
-11. Preview / copy CDN URL / download generated assets
+1. Sign in with Firebase.
+2. Upload a product image.
+3. Confirm the Cloudinary upload.
+4. Run AI product analysis.
+5. Select or create Brand DNA.
+6. Choose colorways and formats.
+7. Start generation.
+8. Track the job in Pipeline.
+9. Open Asset Gallery.
+10. Preview, copy the CDN URL, or download assets.
 
 ---
 
-## 🎯 Hackathon Scope
+## 🏆 Hackathon Context
 
-This project was built for **Pixels to Products — Cloudinary AI Hackathon 2026**, the HackIndia × Cloudinary virtual AI/media hackathon.
+**Hackathon:** Pixels to Products — Cloudinary AI Hackathon 2026
 
-The implementation focuses on a practical e-commerce workflow:
+**Track / Problem Statement:** PS-03 — Your Media-Savvy Startup
 
-> **one source product image → AI understanding → brand-aware generation → multi-format assets → Cloudinary delivery**
+**Team:** Compass Crew
 
-The current repository is optimized for a hackathon demonstration and local development. Production deployment would require hardened infrastructure, managed database configuration, production observability, rate limiting, background job infrastructure, billing, and enterprise-grade authorization/operations.
+The product was designed around a media-first startup workflow where AI generation, media management, transformation, optimization, and delivery are core parts of the user experience.
 
 ---
 
@@ -457,65 +581,41 @@ The current repository is optimized for a hackathon demonstration and local deve
 
 ---
 
-## 🌟 Why OmniStage AI?
+## 🌟 From Manual Production to One Pipeline
 
-Traditional product-media workflows force sellers to manually recreate the same product for:
-- Different colors
-- Different channels
-- Different aspect ratios
-- Different campaign scenes
-- Different brand contexts
-
-OmniStage AI turns that repetitive production workflow into a single reusable pipeline.
-
-### From:
+### Before
 
 ```text
-One photo
-   ↓
-Manual editing
-   ↓
-Multiple Photoshop files
-   ↓
-Manual resizing
-   ↓
-Manual CDN upload
+One Product Photo
+       ↓
+Manual Recoloring
+       ↓
+Manual Resizing
+       ↓
+Manual Scene Creation
+       ↓
+Manual Upload / Organization
 ```
 
-### To:
+### With OmniStage AI
 
 ```text
-One product photo
-   ↓
-OmniStage AI
-   ├── Product understanding
-   ├── Brand DNA
-   ├── Colorways
-   ├── Scenes
-   ├── 1:1
-   ├── 4:5
-   ├── 9:16
-   └── 16:9
-           ↓
-      Cloudinary
-           ↓
-     Ready-to-use assets
+One Product Photo
+       ↓
+AI Understanding
+       ↓
+Brand DNA
+       ↓
+Detail Preservation
+       ↓
+Colorways / Scenes
+       ↓
+1:1 • 4:5 • 9:16 • 16:9
+       ↓
+Cloudinary
+       ↓
+Production-Ready Assets
 ```
-
----
-
-## 📸 Product Experience
-
-The landing experience communicates the actual OmniStage workflow through product-specific visuals, including:
-- Product analysis
-- Brand DNA
-- Colorway transformation
-- Scene generation
-- Multi-format adaptation
-- Cloudinary media delivery
-- Detail preservation
-
-The dashboard then turns that concept into an interactive workflow for creating and managing assets.
 
 ---
 
@@ -523,19 +623,20 @@ The dashboard then turns that concept into an interactive workflow for creating 
 
 This repository was built as a collaborative hackathon project.
 
-For meaningful changes:
-1. Create a feature branch
-2. Make the change
-3. Run lint/build/tests relevant to the area
-4. Open a pull request with a clear description
+For changes:
 
-Please never commit secrets or generated local environment/database files.
+1. Create a feature branch.
+2. Make the change.
+3. Run relevant lint, build, and tests.
+4. Open a pull request with a clear description.
+
+Never commit secrets or generated local environment/database files.
 
 ---
 
 ## 📄 License
 
-Add the license required by the hackathon or your intended distribution model before public production use.
+Add the license required by the hackathon or intended distribution model before production distribution.
 
 ---
 
