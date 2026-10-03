@@ -435,7 +435,7 @@ pytest
 
 ## 🎯 Hackathon Scope
 
-This project was built for the **Build with AI: Code for Communities / Cloudinary AI Hackathon** context.
+This project was built for **Pixels to Products — Cloudinary AI Hackathon 2026**, the HackIndia × Cloudinary virtual AI/media hackathon.
 
 The implementation focuses on a practical e-commerce workflow:
 
